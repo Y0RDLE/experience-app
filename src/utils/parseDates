@@ -1,0 +1,59 @@
+// src/utils/parseDates.js
+
+function toISODate(dateObj) {
+    return dateObj.toISOString().split('T')[0];
+  }
+  
+  function parseSingleDate(raw) {
+    if (!raw) return '';
+  
+    const date = new Date();
+    const year = date.getFullYear();
+  
+    const matchKorean = raw.match(/(\d{1,2})월\s*(\d{1,2})일/);
+    const matchNumeric = raw.match(/(\d{2})[./-](\d{2})/);
+  
+    if (matchKorean) {
+      const [, month, day] = matchKorean;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+  
+    if (matchNumeric) {
+      const [, month, day] = matchNumeric;
+      return `${year}-${month}-${day}`;
+    }
+  
+    return '';
+  }
+  
+  export function parseAnnouncementDate(raw) {
+    return parseSingleDate(raw);
+  }
+  
+  export function parseExperiencePeriod(raw) {
+    if (!raw) return { experienceStart: '', experienceEnd: '' };
+  
+    const matchKorean = raw.match(/(\d{1,2})월\s*(\d{1,2})일\s*[-~]\s*(\d{1,2})월\s*(\d{1,2})일/);
+    const matchNumeric = raw.match(/(\d{2})[./-](\d{2})\s*[-~]\s*(\d{2})[./-](\d{2})/);
+  
+    const year = new Date().getFullYear();
+  
+    if (matchKorean) {
+      const [, m1, d1, m2, d2] = matchKorean;
+      return {
+        experienceStart: `${year}-${m1.padStart(2, '0')}-${d1.padStart(2, '0')}`,
+        experienceEnd: `${year}-${m2.padStart(2, '0')}-${d2.padStart(2, '0')}`,
+      };
+    }
+  
+    if (matchNumeric) {
+      const [, m1, d1, m2, d2] = matchNumeric;
+      return {
+        experienceStart: `${year}-${m1}-${d1}`,
+        experienceEnd: `${year}-${m2}-${d2}`,
+      };
+    }
+  
+    return { experienceStart: '', experienceEnd: '' };
+  }
+  

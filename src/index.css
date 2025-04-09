@@ -1,0 +1,55 @@
+/* 폰트 선언 */
+@font-face {
+  font-family: 'TmoneyRoundWind';
+  src: url('/fonts/TmoneyRoundWindRegular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'TmoneyRoundWind';
+  src: url('/fonts/TmoneyRoundWindExtraBold.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+}
+
+/* Tailwind CSS 기본 디렉티브 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 커스텀 오버라이드 */
+.p-12-important {
+  padding: 2rem !important;
+}
+.gap-12-important > * + * {
+  margin-top: 2rem !important;
+}
+
+/* 테이블 스타일 */
+table {
+  background-color: #FFFFFF !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+th, td {
+  padding: 0.75rem 1rem !important;
+  vertical-align: middle !important;
+  text-align: left !important;
+  border: 1px solid #dcdcdc !important;
+}
+
+/* 글로벌 리셋 */
+body {
+  font-family: 'TmoneyRoundWind', sans-serif;
+  background-color: #FEFAEE !important; /* 커여운병아리색 */
+  color: #333 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box;
+}
+html, body, #root {
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
