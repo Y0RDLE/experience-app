@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  base: './', // ✅ Vercel에서 상대 경로 필요
   define: {
-    'process.env': {}, // Vercel 배포 시 충돌 방지
+    'process.env': {}, // ✅ 환경변수 오류 방지
   },
 });
