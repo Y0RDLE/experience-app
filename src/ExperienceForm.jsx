@@ -5,7 +5,7 @@ import { db } from './firebase';
 import { fetchHtmlFromUrl } from './fetchHtml';
 import { parseExperiencePeriod, parseAnnouncementDate } from './utils/parseDates';
 import { parseReviewNoteText } from './parseReviewNoteText';
-import { parseGangnamText } from './parseGangnamText';
+import { parseGangnamText } from './parseGANGNAMText';
 import { toast } from 'react-toastify';
 
 // 헬퍼 함수: "MM.DD" 형식이면 fallbackYear(announcementDate의 연도 또는 현재 연도)를 붙여 "YYYY-MM-DD" 형식으로 변환
