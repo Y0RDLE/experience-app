@@ -53,3 +53,8 @@ html, body, #root {
   margin: 0 !important;
   padding: 0 !important;
 }
+
+/* placeholder 줄바꿈 스타일 (클래스명: your-input-class) */
+.your-input-class::placeholder {
+  white-space: pre-line;
+}

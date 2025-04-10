@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { format } from 'date-fns';
+import { format, isToday, startOfDay } from 'date-fns';
 import SelectedSticker from './SelectedSticker';
 
 const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }) => {
@@ -35,6 +35,23 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
     });
   }, [items]);
 
+  const today = startOfDay(new Date());
+
+  // ✅ 움직이는 그라데이션 텍스트 강조
+  const renderHighlightedText = (date) => {
+    return (
+      <span
+        className="font-bold text-transparent bg-clip-text animate-gradientText"
+        style={{
+          backgroundImage: 'linear-gradient(270deg,rgb(255, 0, 0),rgba(255, 65, 65, 0.48),rgb(255, 0, 0))',
+          backgroundSize: '1500% 1500%',
+        }}
+      >
+        {format(date, 'M/d')}
+      </span>
+    );
+  };
+
   return (
     <div style={{ minWidth: '960px', fontSize: '90%', marginLeft: '-8px' }}>
       <div
@@ -44,7 +61,6 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
           borderRadius: `${borderRadius}px`,
         }}
       >
-        {/* 카드별 뚜껑 배경 레이어 */}
         <div
           className="absolute top-0 left-0 right-0 h-[78px] rounded-t-[18px]"
           style={{
@@ -53,7 +69,6 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
           }}
         />
 
-        {/* 헤더 + 컬럼헤더 */}
         <div className="relative z-10">
           <div
             className="px-5 py-3 font-extrabold flex justify-between items-center"
@@ -84,12 +99,16 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
         </div>
 
         {items.length === 0 ? (
-          <div className="p-5 text-center text-gray-400 text-sm">데이터가 없습니다.</div>
+          <div className="p-5 text-center text-gray-400 text-sm">
+            데이터가 없습니다.
+          </div>
         ) : (
           items.map((exp, index) => {
             const isHovered = showProvidedItems === exp.id;
             const isLast = exp.id === items[items.length - 1]?.id;
             const isFirst = index === 0;
+            const annDate = exp.announcementDate ? new Date(exp.announcementDate) : null;
+            const expEndDate = exp.experienceEnd ? new Date(exp.experienceEnd) : null;
 
             return (
               <div
@@ -97,7 +116,6 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
                 ref={rowRefs.current[exp.id]}
                 style={{ position: 'relative' }}
               >
-                {/* 리본 */}
                 {exp.selected === true && (
                   <div style={{ position: 'absolute', top: 9, left: -28 }}>
                     <SelectedSticker text="선정!" position="left" />
@@ -108,13 +126,11 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
                   onClick={() => onItemClick?.(exp)}
                   onMouseEnter={() => handleMouseEnter(exp.id)}
                   onMouseLeave={handleMouseLeave}
-                  className={`group transition-all duration-150 cursor-pointer ${
-                    isFirst ? '' : 'border-t'
-                  }`}
+                  className={`group transition-all duration-150 cursor-pointer ${isFirst ? '' : 'border-t'}`}
                   style={{ borderColor: headerColor }}
                 >
                   <div
-                    className="grid px-5 py-4 items-center text-gray-800 leading-relaxed group-hover:bg-[#FFF1E8] gap-4"
+                    className="grid px-5 py-4 items-center leading-relaxed text-gray-800 group-hover:bg-[#FFF1E8] gap-4"
                     style={{ gridTemplateColumns: gridTemplate }}
                   >
                     <div className="text-left flex flex-wrap items-center min-w-0 relative">
@@ -140,21 +156,25 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
                       </a>
                     </div>
                     <div className="text-center">
-                      {exp.announcementDate
-                        ? format(new Date(exp.announcementDate), 'M/d')
+                      {annDate
+                        ? isToday(annDate)
+                          ? renderHighlightedText(annDate)
+                          : <span>{format(annDate, 'M/d')}</span>
                         : ''}
                     </div>
                     <div className="text-center">
-                      {exp.experienceStart && exp.experienceEnd
-                        ? `${format(
-                            new Date(exp.experienceStart),
-                            'M/d'
-                          )} ~ ${format(new Date(exp.experienceEnd), 'M/d')}`
-                        : ''}
+                      {exp.experienceStart && exp.experienceEnd ? (
+                        <>
+                          {format(new Date(exp.experienceStart), 'M/d')} ~{' '}
+                          {expEndDate
+                            ? isToday(expEndDate)
+                              ? renderHighlightedText(expEndDate)
+                              : <span>{format(expEndDate, 'M/d')}</span>
+                            : ''}
+                        </>
+                      ) : ''}
                     </div>
-                    <div className="text-center">
-                      {exp.competitionRatio || '-'}
-                    </div>
+                    <div className="text-center">{exp.competitionRatio || '-'}</div>
                   </div>
 
                   {isHovered && (
@@ -168,14 +188,12 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
                       }}
                     >
                       <span className="text-[#EB373E] text-[13px]">
-                        제공내역 :&nbsp;
+                        제공내역:&nbsp;
                         {exp.providedItems ? (
                           <>
                             {exp.providedItems}
                             {exp.additionalInfo && (
-                              <span className="text-gray-500">
-                                &nbsp;... {exp.additionalInfo}
-                              </span>
+                              <span className="text-gray-500">&nbsp;... {exp.additionalInfo}</span>
                             )}
                           </>
                         ) : (

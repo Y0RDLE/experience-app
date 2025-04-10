@@ -4,10 +4,18 @@ const SelectedSticker = ({
   text = '선정!',
   width = 55,
   height = 40,
+  // 기본값은 기존 색상 (주로 맛집형에 사용)
   startColor = '#F5D194',
   endColor = '#F49D85',
   position = 'left',
+  variant = 'default', // variant prop: 'default' 또는 'leisure'
 }) => {
+  // 만약 variant가 'leisure'이면, 여가형 포인트 컬러로 그라데이션을 변경
+  if (variant === 'leisure') {
+    startColor = '#AEDFB4'; // 예시: accentGreen
+    endColor = '#8CC7A0';   // 예시: 약간 더 어두운 green 계열
+  }
+
   const centerY = Math.round(height / 2);
 
   const stickerStyle = {
@@ -54,7 +62,7 @@ const SelectedSticker = ({
         />
 
         {/* 스파클 4방향 */}
-        {[
+        {[  
           { x: 5, y: 3, begin: '0.3s' },
           { x: 5, y: 32, begin: '0.5s' },
           { x: 40, y: 8, begin: '0.4s' },
