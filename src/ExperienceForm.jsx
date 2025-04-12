@@ -1,4 +1,3 @@
-// ExperienceForm.jsx
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -8,16 +7,19 @@ import { parseReviewNoteText } from './parseReviewNoteText';
 import { parseGangnamText } from './parseGANGNAMText';
 import { toast } from 'react-toastify';
 
-// 헬퍼 함수: "MM.DD" 형식이면 fallbackYear(announcementDate의 연도 또는 현재 연도)를 붙여 "YYYY-MM-DD" 형식으로 변환
+// addYearIfNeeded: MM.DD 형식을 YYYY-MM-DD로 변환 (월, 일이 두 자리)
 const addYearIfNeeded = (dateStr, fallbackYear) => {
-  if (/^\d{2}\.\d{2}$/.test(dateStr)) {
+  const match = dateStr.match(/^(\d{1,2})[\/.](\d{1,2})$/);
+  if (match) {
+    const month = match[1].padStart(2, '0');
+    const day = match[2].padStart(2, '0');
     const year = fallbackYear || new Date().getFullYear();
-    return `${year}-${dateStr.replace('.', '-')}`;
+    return `${year}-${month}-${day}`;
   }
   return dateStr;
 };
 
-// mergeParsedData: 기존 formData의 값이 비어있을 때만 파싱된 값을 덮어쓰기
+// mergeParsedData: 기존 formData의 값이 비어있을 때만 파서 결과 덮어쓰기
 const mergeParsedData = (prev, parsed) => {
   const newData = {};
   Object.keys(parsed).forEach(key => {
@@ -48,6 +50,7 @@ function ExperienceForm({ selectedExperience }) {
     isFamily: false,
     isPetFriendly: false,
     isLeisure: false,
+    regionFull: '',
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -81,32 +84,28 @@ function ExperienceForm({ selectedExperience }) {
     return endDate.toISOString().split('T')[0];
   };
 
-  // 선택된 경험 정보가 있을 경우 초기값 세팅
   useEffect(() => {
     if (selectedExperience) {
       setFormData(prev => ({ ...prev, ...selectedExperience }));
     }
   }, [selectedExperience]);
 
-  // 업체명이 입력되면 네이버 플레이스 URL 자동 호출
   useEffect(() => {
     if (formData.company && !formData.naverPlaceUrl) {
       fetch(`/api/naver-place?name=${encodeURIComponent(formData.company)}`)
-        .then((res) => res.json())
+        .then(res => res.json())
         .then(({ url }) => {
           if (url) {
             setFormData(prev => ({ ...prev, naverPlaceUrl: url }));
           }
         })
-        .catch((err) => console.error('네이버 플레이스 자동 연결 실패:', err));
+        .catch(err => console.error('네이버 플레이스 자동 연결 실패:', err));
     }
   }, [formData.company]);
 
-  // 단순 복붙(일반 텍스트) 추출 처리: 이 경우에만 로딩바를 띄움 (최소 300ms 후 로딩 종료)
   const handleManualExtract = () => {
     const text = formData.extractedText?.trim();
     if (!text) return;
-    // URL 패턴이면 바로 처리 (로딩바 표시 없이)
     if (/^https?:\/\//.test(text)) {
       if (/naver\.me|map\.naver\.com/i.test(text)) {
         handleNaverUrl(text, { showLoading: false });
@@ -115,7 +114,6 @@ function ExperienceForm({ selectedExperience }) {
       }
       return;
     }
-    // 일반 복붙 텍스트 처리: 로딩바 표시
     setIsLoading(true);
     const lowered = text.toLowerCase();
     let siteName = '';
@@ -131,34 +129,39 @@ function ExperienceForm({ selectedExperience }) {
     if (parsed.experiencePeriod) {
       const periodArray = parsed.experiencePeriod.split('~').map(s => s.trim());
       if (periodArray.length === 2) {
-        const fallbackYear = formData.announcementDate ? formData.announcementDate.split('-')[0] : new Date().getFullYear();
+        const fallbackYear = formData.announcementDate 
+          ? formData.announcementDate.split('-')[0] 
+          : new Date().getFullYear();
         experienceStart = addYearIfNeeded(periodArray[0], fallbackYear);
         experienceEnd = addYearIfNeeded(periodArray[1], fallbackYear);
       } else {
-        console.error('parsed.experiencePeriod does not split into 2 parts:', parsed.experiencePeriod);
+        console.error('experiencePeriod does not split into 2 parts:', parsed.experiencePeriod);
       }
     }
     if (parsed.announcementDate) {
       announcementDate = parseAnnouncementDate(parsed.announcementDate);
     }
+    if (!announcementDate && experienceStart) {
+      const start = new Date(experienceStart);
+      start.setDate(start.getDate() - 1);
+      announcementDate = start.toISOString().split('T')[0];
+    }
     const autoEnd = getExperienceEnd(siteName, experienceStart);
     setFormData(prev => ({
       ...prev,
       ...mergeParsedData(prev, parsed),
+      region: parsed.region || prev.region,
+      regionFull: parsed.regionFull || prev.regionFull,
       siteName: !prev.siteName ? siteName : prev.siteName,
       experienceStart: experienceStart || prev.experienceStart,
       experienceEnd: experienceEnd || autoEnd || prev.experienceEnd,
       announcementDate: announcementDate || prev.announcementDate,
-      extractedText: '', // 처리 후 복붙 추출란 내용 지움
+      extractedText: '',
     }));
-    // 최소 300ms 후에 로딩 종료: 사용자가 진행 상태를 볼 수 있도록 함
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.success('요들의 외침! 수동 분석 완료! 🧠', { autoClose: 2000 });
-    }, 300);
+    setIsLoading(false);
+    toast.success('요들의 외침! 수동 분석 완료! 🧠', { autoClose: 2000 });
   };
 
-  // URL 복붙인 경우: 로딩바 없이 처리
   const handleSiteUrl = async (url, options = { showLoading: false }) => {
     if (options.showLoading) setIsLoading(true);
     const matched = Object.entries(siteMapping).find(([prefix]) => url.startsWith(prefix));
@@ -175,11 +178,13 @@ function ExperienceForm({ selectedExperience }) {
     if (parsed.experiencePeriod) {
       const periodArray = parsed.experiencePeriod.split('~').map(s => s.trim());
       if (periodArray.length === 2) {
-        const fallbackYear = formData.announcementDate ? formData.announcementDate.split('-')[0] : new Date().getFullYear();
+        const fallbackYear = formData.announcementDate 
+          ? formData.announcementDate.split('-')[0] 
+          : new Date().getFullYear();
         experienceStart = addYearIfNeeded(periodArray[0], fallbackYear);
         experienceEnd = addYearIfNeeded(periodArray[1], fallbackYear);
       } else {
-        console.error('parsed.experiencePeriod does not split into 2 parts:', parsed.experiencePeriod);
+        console.error('experiencePeriod does not split into 2 parts:', parsed.experiencePeriod);
       }
     }
     if (parsed.announcementDate) {
@@ -194,7 +199,7 @@ function ExperienceForm({ selectedExperience }) {
       experienceStart: experienceStart || prev.experienceStart,
       experienceEnd: experienceEnd || autoEnd || prev.experienceEnd,
       announcementDate: announcementDate || prev.announcementDate,
-      extractedText: '', // URL 입력 시 복붙 추출란 비움
+      extractedText: '',
     }));
     if (options.showLoading) setIsLoading(false);
     toast.success('사이트 URL 자동 처리 완료!', { autoClose: 2000 });
@@ -251,11 +256,13 @@ function ExperienceForm({ selectedExperience }) {
       if (parsed.experiencePeriod) {
         const periodArray = parsed.experiencePeriod.split('~').map(s => s.trim());
         if (periodArray.length === 2) {
-          const fallbackYear = formData.announcementDate ? formData.announcementDate.split('-')[0] : new Date().getFullYear();
+          const fallbackYear = formData.announcementDate 
+            ? formData.announcementDate.split('-')[0] 
+            : new Date().getFullYear();
           experienceStart = addYearIfNeeded(periodArray[0], fallbackYear);
           experienceEnd = addYearIfNeeded(periodArray[1], fallbackYear);
         } else {
-          console.error('parsed.experiencePeriod does not split into 2 parts:', parsed.experiencePeriod);
+          console.error('experiencePeriod does not split into 2 parts:', parsed.experiencePeriod);
         }
       }
       if (parsed.announcementDate) {
@@ -270,7 +277,7 @@ function ExperienceForm({ selectedExperience }) {
         experienceStart: experienceStart || prev.experienceStart,
         experienceEnd: experienceEnd || autoEnd || prev.experienceEnd,
         announcementDate: announcementDate || prev.announcementDate,
-        extractedText: '', // URL 입력 시 복붙 추출란 비움
+        extractedText: '',
       }));
       setIsLoading(false);
       toast.success('사이트 URL 자동 처리 완료!', { autoClose: 2000 });
@@ -325,6 +332,23 @@ function ExperienceForm({ selectedExperience }) {
     }
   };
 
+  // "숙제끗" 버튼은 selectedExperience가 존재하고,
+  // 그리고 formData.selected 값이 boolean true (즉, 선정 처리된 상태)인 경우에만 표시합니다.
+  const handleComplete = async () => {
+    try {
+      const dataToSave = { ...formData, selected: '완료' };
+      if (selectedExperience) {
+        const ref = doc(db, 'experiences', selectedExperience.id);
+        await updateDoc(ref, dataToSave);
+        toast.success('요들의 외침! 숙제끗! ✍', { autoClose: 2000 });
+      }
+      resetForm();
+    } catch (error) {
+      console.error('요들의 외침! 리뷰 완료 처리 실패!:', error);
+      toast.error('요들의 외침! 리뷰 완료 처리 실패!', { autoClose: 2000 });
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       company: '',
@@ -345,6 +369,7 @@ function ExperienceForm({ selectedExperience }) {
       isFamily: false,
       isPetFriendly: false,
       isLeisure: false,
+      regionFull: '',
     });
   };
 
@@ -378,13 +403,7 @@ function ExperienceForm({ selectedExperience }) {
             <div key={name} className="flex flex-col">
               <label className="font-semibold mb-1">{label}</label>
               <input
-                type={
-                  (name === 'announcementDate' ||
-                   name === 'experienceStart' ||
-                   name === 'experienceEnd')
-                    ? 'date'
-                    : 'text'
-                }
+                type={(name === 'announcementDate' || name === 'experienceStart' || name === 'experienceEnd') ? 'date' : 'text'}
                 name={name}
                 value={formData[name]}
                 onChange={handleChange}
@@ -432,10 +451,19 @@ function ExperienceForm({ selectedExperience }) {
           <button
             type="button"
             onClick={handleUnselected}
-            className="bg-gray-300 text-gray-700 py-1 rounded-md hover:opacity-90 text-sm px-5"
+            className="bg-gray-300 text-gray-700 px-[18px] py-1 rounded-md hover:opacity-90 text-sm"
           >
             미선정
           </button>
+          {selectedExperience && formData.selected === true && (
+            <button
+              type="button"
+              onClick={handleComplete}
+              className="bg-green-500 text-white px-[18px] py-2 rounded-md hover:opacity-90 text-sm"
+            >
+              숙제끗
+            </button>
+          )}
           <button
             type="submit"
             className="bg-accentOrange text-white px-6 py-2 rounded-md hover:opacity-90 text-sm"

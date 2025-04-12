@@ -28,7 +28,7 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
   const gridTemplate = 'minmax(220px, auto) repeat(5, 1fr)';
 
   useEffect(() => {
-    items.forEach((exp) => {
+    items.forEach(exp => {
       if (!rowRefs.current[exp.id]) {
         rowRefs.current[exp.id] = React.createRef();
       }
@@ -37,13 +37,13 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
 
   const today = startOfDay(new Date());
 
-  // ✅ 움직이는 그라데이션 텍스트 강조
+  // 오늘 날짜이면 그라데이션 텍스트 효과 적용
   const renderHighlightedText = (date) => {
     return (
       <span
         className="font-bold text-transparent bg-clip-text animate-gradientText"
         style={{
-          backgroundImage: 'linear-gradient(270deg,rgb(255, 0, 0),rgba(255, 65, 65, 0.48),rgb(255, 0, 0))',
+          backgroundImage: 'linear-gradient(270deg, rgb(255, 0, 0), rgba(255, 65, 65, 0.48), rgb(255, 0, 0))',
           backgroundSize: '1500% 1500%',
         }}
       >
@@ -68,7 +68,6 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
             zIndex: 0,
           }}
         />
-
         <div className="relative z-10">
           <div
             className="px-5 py-3 font-extrabold flex justify-between items-center"
@@ -81,7 +80,6 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
             <h2 className="text-[18px] text-white">{title}</h2>
             <span className="text-xs text-white">총 {items.length}건</span>
           </div>
-
           <div
             className="grid px-5 py-2.5 text-[11px] font-semibold text-white gap-4"
             style={{
@@ -97,11 +95,8 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
             <div className="text-center">경쟁률</div>
           </div>
         </div>
-
         {items.length === 0 ? (
-          <div className="p-5 text-center text-gray-400 text-sm">
-            데이터가 없습니다.
-          </div>
+          <div className="p-5 text-center text-gray-400 text-sm">데이터가 없습니다.</div>
         ) : (
           items.map((exp, index) => {
             const isHovered = showProvidedItems === exp.id;
@@ -111,17 +106,12 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
             const expEndDate = exp.experienceEnd ? new Date(exp.experienceEnd) : null;
 
             return (
-              <div
-                key={exp.id}
-                ref={rowRefs.current[exp.id]}
-                style={{ position: 'relative' }}
-              >
+              <div key={exp.id} ref={rowRefs.current[exp.id]} style={{ position: 'relative' }}>
                 {exp.selected === true && (
                   <div style={{ position: 'absolute', top: 9, left: -28 }}>
                     <SelectedSticker text="선정!" position="left" />
                   </div>
                 )}
-
                 <div
                   onClick={() => onItemClick?.(exp)}
                   onMouseEnter={() => handleMouseEnter(exp.id)}
@@ -156,27 +146,18 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
                       </a>
                     </div>
                     <div className="text-center">
-                      {annDate
-                        ? isToday(annDate)
-                          ? renderHighlightedText(annDate)
-                          : <span>{format(annDate, 'M/d')}</span>
-                        : ''}
+                      {annDate ? (isToday(annDate) ? renderHighlightedText(annDate) : <span>{format(annDate, 'M/d')}</span>) : ''}
                     </div>
                     <div className="text-center">
                       {exp.experienceStart && exp.experienceEnd ? (
                         <>
                           {format(new Date(exp.experienceStart), 'M/d')} ~{' '}
-                          {expEndDate
-                            ? isToday(expEndDate)
-                              ? renderHighlightedText(expEndDate)
-                              : <span>{format(expEndDate, 'M/d')}</span>
-                            : ''}
+                          {expEndDate ? (isToday(expEndDate) ? renderHighlightedText(expEndDate) : <span>{format(expEndDate, 'M/d')}</span>) : ''}
                         </>
                       ) : ''}
                     </div>
                     <div className="text-center">{exp.competitionRatio || '-'}</div>
                   </div>
-
                   {isHovered && (
                     <div
                       className="px-5 py-2.5 border-t flex items-center text-sm group-hover:bg-[#FFF1E8]"

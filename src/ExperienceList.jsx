@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import SectionCard from './SectionCard';
@@ -22,10 +22,11 @@ const ExperienceList = ({ onSelect }) => {
     return () => unsubscribe();
   }, []);
 
-  // "선정" 또는 "선정 대기" 상태만 표시하도록 필터링
-  const visibleExperiences = experiences.filter(
-    (exp) => exp.selected === true || exp.selected === '대기'
-  );
+  // selected가 true 또는 (문자열에서 trim 후 "대기")인 항목만 표시
+  const visibleExperiences = experiences.filter(exp => {
+    const status = typeof exp.selected === 'string' ? exp.selected.trim() : exp.selected;
+    return status === true || status === '대기';
+  });
 
   // 검색 필터
   const filtered = visibleExperiences.filter(exp =>
@@ -44,15 +45,13 @@ const ExperienceList = ({ onSelect }) => {
     (a, b) => new Date(a.announcementDate) - new Date(b.announcementDate)
   );
 
-  const combined = [...sortedHomeExperiences, ...sortedLeisureExperiences];
-
-  const gridTemplateColumns = useMemo(() => {
-    return getMaxGridTemplateColumns(combined);
-  }, [combined]);
+  const gridTemplateColumns = useMemo(
+    () => getMaxGridTemplateColumns([...sortedHomeExperiences, ...sortedLeisureExperiences]),
+    [sortedHomeExperiences, sortedLeisureExperiences]
+  );
 
   return (
-    <div className="px-10 py-10 bg-customBg min-h-screen" /* space-y 대신 수동으로 간격 조정할 수도 있음 */>
-      {/* 검색창 등 추가 UI가 필요하다면 이곳에 배치 */}
+    <div className="px-10 py-10 bg-customBg min-h-screen">
       <div className="space-y-11">
         <SectionCard
           title="맛집형 체험단 현황"
@@ -61,7 +60,6 @@ const ExperienceList = ({ onSelect }) => {
           onItemClick={onSelect}
           gridTemplateColumns={gridTemplateColumns}
         />
-        {/* 맛집형과 여가형 간 간격을 줄이기 위해 space-y-4 사용 */}
         <SectionCard
           title="여가형 체험단 현황"
           headerColor="#85DBAF"
