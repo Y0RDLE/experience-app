@@ -1,4 +1,5 @@
-// 리뷰노트 전용 텍스트 기반 파서 (텍스트 원문 복붙 대응)
+// ✅ 리뷰노트 전용 텍스트 기반 파서 (복붙 대응 최종본)
+
 export function parseReviewNoteText(text) {
   const clean = (s) => s?.replace(/\s+/g, ' ').trim();
 
@@ -41,5 +42,6 @@ export function parseReviewNoteText(text) {
     keywords: keywordMatch ? keywordMatch.join(', ') : '',
     mission: missionText,
     competitionRatio,
+    text: text // 원본 보관용
   };
 }

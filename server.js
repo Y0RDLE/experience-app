@@ -1,14 +1,16 @@
-// server.js
+// ✅ server.js - fetch + puppeteer 동시 탑재 완성형
+
 import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch';
+import puppeteer from 'puppeteer';
 
 const app = express();
 const PORT = 4000;
 
 app.use(cors());
 
-// HTML을 가져와 JSON으로 반환하는 프록시 엔드포인트
+// ✅ HTML fetch 프록시
 app.get('/api/fetch-html', async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) {
@@ -18,7 +20,6 @@ app.get('/api/fetch-html', async (req, res) => {
 
   try {
     const response = await fetch(targetUrl, {
-      // User-Agent 헤더를 추가하여 일반 브라우저 요청처럼 보이게 할 수 있습니다.
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
                       'AppleWebKit/537.36 (KHTML, like Gecko) ' +
@@ -30,20 +31,16 @@ app.get('/api/fetch-html', async (req, res) => {
       return res.status(response.status).json({ error: '대상 URL 요청 실패' });
     }
     const html = await response.text();
-    console.log('✅ HTML 일부:', html.slice(0, 300)); // 디버깅용 출력
+    console.log('✅ HTML 일부:', html.slice(0, 300));
 
-    // 각 사이트마다 구조와 사용하는 단어가 다르므로, 여기서
-    // 완전한 파싱은 하지 않고 원본 HTML만 클라이언트에 전달합니다.
-    // 클라이언트에서는 사이트별 파서 로직을 통해 필요한 데이터(회사, 지역, 체험기간, 발표일 등)를 추출합니다.
     const result = {
-      // 기본적으로 미리 할당해두었지만, 필요에 따라 여기에 추가 데이터 가공도 가능
       company: '',
       region: '',
       providedItems: '',
       experiencePeriod: '',
       announcementDate: '',
       competitionRatio: '',
-      text: html, // 원본 HTML
+      text: html,
     };
 
     res.setHeader('Content-Type', 'application/json');
@@ -51,6 +48,35 @@ app.get('/api/fetch-html', async (req, res) => {
   } catch (error) {
     console.error('❌ HTML 요청 실패:', error);
     res.status(500).json({ error: '서버 오류 발생' });
+  }
+});
+
+// ✅ 네이버 플레이스 크롤링 (puppeteer 기반)
+app.get('/api/naver-place', async (req, res) => {
+  const { name } = req.query;
+  if (!name) return res.status(400).json({ error: 'Missing name' });
+
+  try {
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    const page = await browser.newPage();
+    const searchUrl = `https://search.naver.com/search.naver?query=${encodeURIComponent(name)}`;
+    await page.goto(searchUrl, { waitUntil: 'networkidle2' });
+
+    const link = await page.evaluate(() => {
+      const el = document.querySelector('a.place_bluelink, a.tit, a[href*="map.naver.com"]');
+      return el?.href || '';
+    });
+
+    await browser.close();
+
+    if (link) return res.json({ url: link });
+    else return res.status(404).json({ error: 'Not found' });
+  } catch (err) {
+    console.error('[Naver Place Error]', err);
+    return res.status(500).json({ error: 'Internal Error' });
   }
 });
 

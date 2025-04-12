@@ -1,57 +1,61 @@
+// ExperienceForm.jsx 최종 완전체 - 500줄 이상 보장 🧠🔥
+
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
 import { fetchHtmlFromUrl } from './fetchHtml';
-import { parseExperiencePeriod, parseAnnouncementDate } from './utils/parseDates';
 import { parseReviewNoteText } from './parseReviewNoteText';
 import { parseGangnamText } from './parseGANGNAMText';
+import { parseStorynText } from './parseStorynText';
+import { parseAnnouncementDate } from './utils/parseDates';
 import { toast } from 'react-toastify';
 
-// addYearIfNeeded: MM.DD 형식을 YYYY-MM-DD로 변환 (월, 일이 두 자리)
+// ⬇️ 날짜 형식 보정
 const addYearIfNeeded = (dateStr, fallbackYear) => {
-  const match = dateStr.match(/^(\d{1,2})[\/.](\d{1,2})$/);
+  const match = dateStr.match(/^\d{1,2}[\/.]\d{1,2}$/);
   if (match) {
-    const month = match[1].padStart(2, '0');
-    const day = match[2].padStart(2, '0');
+    const [month, day] = dateStr.split(/[\/.]/).map(v => v.padStart(2, '0'));
     const year = fallbackYear || new Date().getFullYear();
     return `${year}-${month}-${day}`;
   }
   return dateStr;
 };
 
-// mergeParsedData: 기존 formData의 값이 비어있을 때만 파서 결과 덮어쓰기
+// ⬇️ 기존 데이터 유지하며 병합
 const mergeParsedData = (prev, parsed) => {
   const newData = {};
-  Object.keys(parsed).forEach(key => {
+  for (const key in parsed) {
     if ((!prev[key] || prev[key] === '') && parsed[key]) {
       newData[key] = parsed[key];
     }
-  });
+  }
   return newData;
 };
 
+// ⬇️ 체험 종료일 계산
+const getExperienceEnd = (site, startDateStr) => {
+  if (!startDateStr) return '';
+  const daysMap = {
+    '강남맛집': 21, '리뷰노트': 13, '디너의여왕': 14,
+    '레뷰': 19, '스토리앤미디어': 20, '미블': 11
+  };
+  const days = daysMap[site] || 0;
+  if (!days) return '';
+  const d = new Date(startDateStr);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+};
+
+// ⬇️ 전체 폼 컴포넌트
 function ExperienceForm({ selectedExperience }) {
   const [formData, setFormData] = useState({
-    company: '',
-    region: '',
-    siteUrl: '',
-    siteName: '',
-    naverPlaceUrl: '',
-    announcementDate: '',
-    experienceStart: '',
-    experienceEnd: '',
-    competitionRatio: '',
-    selected: null,
-    providedItems: '',
-    additionalInfo: '',
-    extractedText: '',
-    type: 'home',
-    isClip: false,
-    isFamily: false,
-    isPetFriendly: false,
-    isLeisure: false,
-    regionFull: '',
+    company: '', region: '', siteUrl: '', siteName: '',
+    naverPlaceUrl: '', announcementDate: '', experienceStart: '', experienceEnd: '',
+    competitionRatio: '', selected: null, providedItems: '', additionalInfo: '',
+    extractedText: '', type: 'home', isClip: false, isFamily: false, isPetFriendly: false,
+    isLeisure: false, regionFull: '',
   });
+
   const [isLoading, setIsLoading] = useState(false);
 
   const siteMapping = {
@@ -66,43 +70,36 @@ function ExperienceForm({ selectedExperience }) {
     'https://mrble.net/': '미블',
   };
 
-  const getExperienceEnd = (site, startDateStr) => {
-    if (!startDateStr) return '';
-    const startDate = new Date(startDateStr);
-    let days = 0;
-    switch (site) {
-      case '강남맛집': days = 21; break;
-      case '리뷰노트': days = 13; break;
-      case '디너의여왕': days = 14; break;
-      case '레뷰': days = 19; break;
-      case '스토리앤미디어': days = 20; break;
-      case '미블': days = 11; break;
-      default: return '';
-    }
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + days);
-    return endDate.toISOString().split('T')[0];
-  };
-
+  // ⬇️ 복붙된 URL 자동 처리
   useEffect(() => {
-    if (selectedExperience) {
-      setFormData(prev => ({ ...prev, ...selectedExperience }));
+    const text = formData.extractedText?.trim();
+    if (!text) return;
+    if (/^https?:\/\//.test(text)) {
+      if (/naver\.me|map\.naver\.com/i.test(text)) {
+        handleNaverUrl(text, { showLoading: true });
+      } else {
+        setFormData(prev => ({ ...prev, siteUrl: text, extractedText: '' }));
+        setTimeout(() => handleSiteUrl(text, { showLoading: true }), 0);
+      }
     }
+  }, [formData.extractedText]);
+
+  // ⬇️ 기존 항목 로딩
+  useEffect(() => {
+    if (selectedExperience) setFormData(prev => ({ ...prev, ...selectedExperience }));
   }, [selectedExperience]);
 
+  // ⬇️ 네이버 자동채움
   useEffect(() => {
     if (formData.company && !formData.naverPlaceUrl) {
       fetch(`/api/naver-place?name=${encodeURIComponent(formData.company)}`)
         .then(res => res.json())
-        .then(({ url }) => {
-          if (url) {
-            setFormData(prev => ({ ...prev, naverPlaceUrl: url }));
-          }
-        })
-        .catch(err => console.error('네이버 플레이스 자동 연결 실패:', err));
+        .then(({ url }) => url && setFormData(prev => ({ ...prev, naverPlaceUrl: url })))
+        .catch(console.error);
     }
   }, [formData.company]);
 
+  // ⬇️ 수동 입력 처리 (텍스트)
   const handleManualExtract = () => {
     const text = formData.extractedText?.trim();
     if (!text) return;
@@ -116,36 +113,16 @@ function ExperienceForm({ selectedExperience }) {
     }
     setIsLoading(true);
     const lowered = text.toLowerCase();
-    let siteName = '';
-    let parsed = {};
+    let siteName = '', parsed = {};
     if (lowered.includes('reviewnote') || lowered.includes('리뷰노트')) {
-      siteName = '리뷰노트';
-      parsed = parseReviewNoteText(text);
-    } else if (lowered.includes('강남맛집') || lowered.includes('939au0g4vj8sq')) {
-      siteName = '강남맛집';
-      parsed = parseGangnamText(text);
+      siteName = '리뷰노트'; parsed = parseReviewNoteText(text);
+    } else if (lowered.includes('939au0g4vj8sq') || lowered.includes('강남맛집')) {
+      siteName = '강남맛집'; parsed = parseGangnamText(text);
+    } else if (lowered.includes('storyn.kr') || lowered.includes('스토리앤미디어')) {
+      siteName = '스토리앤미디어'; parsed = parseStorynText(text);
     }
-    let experienceStart = '', experienceEnd = '', announcementDate = '';
-    if (parsed.experiencePeriod) {
-      const periodArray = parsed.experiencePeriod.split('~').map(s => s.trim());
-      if (periodArray.length === 2) {
-        const fallbackYear = formData.announcementDate 
-          ? formData.announcementDate.split('-')[0] 
-          : new Date().getFullYear();
-        experienceStart = addYearIfNeeded(periodArray[0], fallbackYear);
-        experienceEnd = addYearIfNeeded(periodArray[1], fallbackYear);
-      } else {
-        console.error('experiencePeriod does not split into 2 parts:', parsed.experiencePeriod);
-      }
-    }
-    if (parsed.announcementDate) {
-      announcementDate = parseAnnouncementDate(parsed.announcementDate);
-    }
-    if (!announcementDate && experienceStart) {
-      const start = new Date(experienceStart);
-      start.setDate(start.getDate() - 1);
-      announcementDate = start.toISOString().split('T')[0];
-    }
+    const [experienceStart, experienceEnd] = parsed.experiencePeriod?.split('~').map(s => addYearIfNeeded(s.trim())) || [];
+    const announcementDate = parsed.announcementDate ? parseAnnouncementDate(parsed.announcementDate) : (experienceStart ? new Date(new Date(experienceStart).setDate(new Date(experienceStart).getDate() - 1)).toISOString().split('T')[0] : '');
     const autoEnd = getExperienceEnd(siteName, experienceStart);
     setFormData(prev => ({
       ...prev,
@@ -173,7 +150,11 @@ function ExperienceForm({ selectedExperience }) {
       parsed = parseReviewNoteText(rawText);
     } else if (detectedSiteName === '강남맛집') {
       parsed = parseGangnamText(rawText);
+    } else if (detectedSiteName === '스토리앤미디어') {
+      parsed = parseStorynText(rawText);
     }
+  
+    // ✅ 날짜 추출
     let experienceStart = '', experienceEnd = '', announcementDate = '';
     if (parsed.experiencePeriod) {
       const periodArray = parsed.experiencePeriod.split('~').map(s => s.trim());
@@ -183,14 +164,22 @@ function ExperienceForm({ selectedExperience }) {
           : new Date().getFullYear();
         experienceStart = addYearIfNeeded(periodArray[0], fallbackYear);
         experienceEnd = addYearIfNeeded(periodArray[1], fallbackYear);
-      } else {
-        console.error('experiencePeriod does not split into 2 parts:', parsed.experiencePeriod);
       }
     }
+  
     if (parsed.announcementDate) {
       announcementDate = parseAnnouncementDate(parsed.announcementDate);
     }
+  
+    // 🔥 이게 빠졌으면 무조건 넣어야 함!!
+    if (!announcementDate && experienceStart) {
+      const start = new Date(experienceStart);
+      start.setDate(start.getDate() - 1);
+      announcementDate = start.toISOString().split('T')[0];
+    }
+  
     const autoEnd = getExperienceEnd(detectedSiteName, experienceStart);
+  
     setFormData(prev => ({
       ...prev,
       siteUrl: url,
@@ -201,9 +190,11 @@ function ExperienceForm({ selectedExperience }) {
       announcementDate: announcementDate || prev.announcementDate,
       extractedText: '',
     }));
+  
     if (options.showLoading) setIsLoading(false);
     toast.success('사이트 URL 자동 처리 완료!', { autoClose: 2000 });
   };
+  
 
   const handleNaverUrl = (url, options = { showLoading: false }) => {
     if (options.showLoading) setIsLoading(true);
@@ -261,8 +252,6 @@ function ExperienceForm({ selectedExperience }) {
             : new Date().getFullYear();
           experienceStart = addYearIfNeeded(periodArray[0], fallbackYear);
           experienceEnd = addYearIfNeeded(periodArray[1], fallbackYear);
-        } else {
-          console.error('experiencePeriod does not split into 2 parts:', parsed.experiencePeriod);
         }
       }
       if (parsed.announcementDate) {
@@ -320,20 +309,16 @@ function ExperienceForm({ selectedExperience }) {
       if (selectedExperience) {
         const ref = doc(db, 'experiences', selectedExperience.id);
         await updateDoc(ref, dataToSave);
-        toast.success('요들의 외침! 🛑 미선정 ㅆㅑ갈!', { autoClose: 2000 });
       } else {
         await addDoc(collection(db, 'experiences'), dataToSave);
-        toast.success('요들의 외침! 🛑 미선정 ㅆㅑ갈!', { autoClose: 2000 });
       }
       resetForm();
+      toast.success('요들의 외침! 🛑 미선정 ㅆㅑ갈!', { autoClose: 2000 });
     } catch (error) {
-      console.error('저장 실패:', error);
       toast.error('요들의 외침! 다시 시도해! 😞', { autoClose: 2000 });
     }
   };
 
-  // "숙제끗" 버튼은 selectedExperience가 존재하고,
-  // 그리고 formData.selected 값이 boolean true (즉, 선정 처리된 상태)인 경우에만 표시합니다.
   const handleComplete = async () => {
     try {
       const dataToSave = { ...formData, selected: '완료' };
@@ -344,7 +329,6 @@ function ExperienceForm({ selectedExperience }) {
       }
       resetForm();
     } catch (error) {
-      console.error('요들의 외침! 리뷰 완료 처리 실패!:', error);
       toast.error('요들의 외침! 리뷰 완료 처리 실패!', { autoClose: 2000 });
     }
   };
@@ -373,7 +357,7 @@ function ExperienceForm({ selectedExperience }) {
     });
   };
 
-  return (
+    return (
     <div className="bg-white p-8 shadow-[0_6px_20px_rgba(0,0,0,0.1)] rounded-[20px] w-full space-y-6">
       {isLoading && (
         <>
@@ -417,13 +401,13 @@ function ExperienceForm({ selectedExperience }) {
           ))}
         </div>
         <div>
-          <label className="font-semibold mb-1 block">복붙 추출란</label>
+          <label className="font-semibold mb-1 block items-center">복붙 추출란</label>
           <textarea
             name="extractedText"
             value={formData.extractedText}
             onChange={handleChange}
             onBlur={handleManualExtract}
-            placeholder="단순 복붙 자동 채움 기능은 강남맛집만 구현 (URL 붙여넣으면 자동 처리)"
+            placeholder="단순 복붙 강남맛집, 리뷰노트 구현 완료" 
             className="w-full h-40 p-3 bg-yellow-100 text-xs rounded-md shadow-inner font-mono"
           />
         </div>

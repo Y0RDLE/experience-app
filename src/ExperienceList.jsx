@@ -1,3 +1,5 @@
+// ✅ ExperienceList.jsx - 완성형 (완료 제외하고 대기/선정만 표시)
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
@@ -22,22 +24,22 @@ const ExperienceList = ({ onSelect }) => {
     return () => unsubscribe();
   }, []);
 
-  // selected가 true 또는 (문자열에서 trim 후 "대기")인 항목만 표시
+  // ✅ selected가 true 또는 '대기'인 항목만 표시 (완료, 미선정 제외)
   const visibleExperiences = experiences.filter(exp => {
     const status = typeof exp.selected === 'string' ? exp.selected.trim() : exp.selected;
     return status === true || status === '대기';
   });
 
-  // 검색 필터
+  // 🔍 검색 필터
   const filtered = visibleExperiences.filter(exp =>
     exp.company?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // 맛집형과 여가형 분리
+  // 🍽️ 맛집형과 🎡 여가형 분리
   const homeExperiences = filtered.filter(x => x.type === 'home' && x.isLeisure !== true);
   const leisureExperiences = filtered.filter(x => x.isLeisure === true);
 
-  // 발표일 기준 정렬
+  // 📅 발표일 기준 정렬
   const sortedHomeExperiences = [...homeExperiences].sort(
     (a, b) => new Date(a.announcementDate) - new Date(b.announcementDate)
   );
