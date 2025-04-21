@@ -4,7 +4,7 @@ import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
 import { fetchHtmlFromUrl } from './fetchHtml';
 import { parseReviewNoteText } from './parseReviewNoteText';
-import { parseGangnamText } from './parseGangnamText';
+import { parseGANGNAMText } from './parseGANGNAMText';
 import { parseStorynText } from './parseStorynText';
 import { parseAnnouncementDate } from './utils/parseDates';
 import { toast } from 'react-toastify';
@@ -148,7 +148,7 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
       parsed = parseReviewNoteText(t);
     } else if (l.includes('강남맛집')) {
       siteName = '강남맛집';
-      parsed = parseGangnamText(t);
+      parsed = parseGANGNAMText(t);
     } else if (l.includes('스토리앤미디어')) {
       siteName = '스토리앤미디어';
       parsed = parseStorynText(t);
@@ -198,7 +198,7 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
     let parsed = {};
 
     if (siteName === '리뷰노트') parsed = parseReviewNoteText(txt);
-    else if (siteName === '강남맛집') parsed = parseGangnamText(txt);
+    else if (siteName === '강남맛집') parsed = parseGANGNAMText(txt);
     else if (siteName === '스토리앤미디어') parsed = parseStorynText(txt);
 
     const [start] = parsed.experiencePeriod?.split('~').map(s => addYearIfNeeded(s.trim())) || [];
