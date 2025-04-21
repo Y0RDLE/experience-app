@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { format, isToday, startOfDay } from 'date-fns';
 import SelectedSticker from './SelectedSticker';
 
-const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }) => {
+const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick, gridTemplateColumns }) => {
   const [showProvidedItems, setShowProvidedItems] = useState(null);
   const borderRadius = 20;
   const rowRefs = useRef({});
@@ -25,8 +25,6 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
     ));
   };
 
-  const gridTemplate = 'minmax(220px, auto) repeat(5, 1fr)';
-
   useEffect(() => {
     items.forEach(exp => {
       if (!rowRefs.current[exp.id]) {
@@ -37,7 +35,6 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
 
   const today = startOfDay(new Date());
 
-  // 오늘 날짜이면 그라데이션 텍스트 효과 적용
   const renderHighlightedText = (date) => {
     return (
       <span
@@ -51,6 +48,8 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
       </span>
     );
   };
+
+  const gridTemplate = 'minmax(220px, auto) repeat(5, 1fr)';
 
   return (
     <div style={{ minWidth: '960px', fontSize: '90%', marginLeft: '-8px' }}>

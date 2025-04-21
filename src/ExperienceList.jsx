@@ -1,55 +1,33 @@
-// ✅ ExperienceList.jsx - 완성형 (완료 제외하고 대기/선정만 표시)
-
-import React, { useState, useMemo, useEffect } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from './firebase';
+// src/ExperienceList.jsx
+import React, { useMemo } from 'react';
 import SectionCard from './SectionCard';
 import { getMaxGridTemplateColumns } from './utils/gridUtils';
 
-const ExperienceList = ({ onSelect }) => {
-  const [experiences, setExperiences] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
+export default function ExperienceList({ experiences, onSelect }) {
+  // selected가 true, '대기', 또는 null인 항목만 표시 (false/미선정, '완료' 제외)
+  const visible = experiences.filter(exp =>
+    exp.selected === true ||
+    exp.selected === '대기' ||
+    exp.selected == null
+  );
 
-  useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, 'experiences'),
-      (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setExperiences(data);
-      },
-      (error) => {
-        console.error("데이터 로드 실패:", error);
-      }
+  // 맛집형 / 여가형 분리
+  const home = visible.filter(x => x.type === 'home' && !x.isLeisure);
+  const leisure = visible.filter(x => x.isLeisure);
+
+  // 발표일 순 정렬
+  const sortByDate = arr =>
+    [...arr].sort(
+      (a, b) =>
+        new Date(a.announcementDate) - new Date(b.announcementDate)
     );
-    return () => unsubscribe();
-  }, []);
+  const sortedHome = sortByDate(home);
+  const sortedLeisure = sortByDate(leisure);
 
-  // ✅ selected가 true 또는 '대기'인 항목만 표시 (완료, 미선정 제외)
-  const visibleExperiences = experiences.filter(exp => {
-    const status = typeof exp.selected === 'string' ? exp.selected.trim() : exp.selected;
-    return status === true || status === '대기';
-  });
-
-  // 🔍 검색 필터
-  const filtered = visibleExperiences.filter(exp =>
-    exp.company?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // 🍽️ 맛집형과 🎡 여가형 분리
-  const homeExperiences = filtered.filter(x => x.type === 'home' && x.isLeisure !== true);
-  const leisureExperiences = filtered.filter(x => x.isLeisure === true);
-
-  // 📅 발표일 기준 정렬
-  const sortedHomeExperiences = [...homeExperiences].sort(
-    (a, b) => new Date(a.announcementDate) - new Date(b.announcementDate)
-  );
-  const sortedLeisureExperiences = [...leisureExperiences].sort(
-    (a, b) => new Date(a.announcementDate) - new Date(b.announcementDate)
-  );
-
-  const gridTemplateColumns = useMemo(
-    () => getMaxGridTemplateColumns([...sortedHomeExperiences, ...sortedLeisureExperiences]),
-    [sortedHomeExperiences, sortedLeisureExperiences]
+  // 그리드 컬럼 계산
+  const gridCols = useMemo(
+    () => getMaxGridTemplateColumns([...sortedHome, ...sortedLeisure]),
+    [sortedHome, sortedLeisure]
   );
 
   return (
@@ -58,20 +36,18 @@ const ExperienceList = ({ onSelect }) => {
         <SectionCard
           title="맛집형 체험단 현황"
           headerColor="#F5D194"
-          items={sortedHomeExperiences}
+          items={sortedHome}
           onItemClick={onSelect}
-          gridTemplateColumns={gridTemplateColumns}
+          gridTemplateColumns={gridCols}
         />
         <SectionCard
           title="여가형 체험단 현황"
           headerColor="#85DBAF"
-          items={sortedLeisureExperiences}
+          items={sortedLeisure}
           onItemClick={onSelect}
-          gridTemplateColumns={gridTemplateColumns}
+          gridTemplateColumns={gridCols}
         />
       </div>
     </div>
   );
-};
-
-export default ExperienceList;
+}

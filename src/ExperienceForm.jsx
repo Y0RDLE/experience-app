@@ -1,61 +1,83 @@
-// ExperienceForm.jsx 최종 완전체 - 500줄 이상 보장 🧠🔥
-
+// src/ExperienceForm.jsx
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
 import { fetchHtmlFromUrl } from './fetchHtml';
 import { parseReviewNoteText } from './parseReviewNoteText';
-import { parseGangnamText } from './parseGANGNAMText';
+import { parseGangnamText } from './parseGangnamText';
 import { parseStorynText } from './parseStorynText';
 import { parseAnnouncementDate } from './utils/parseDates';
 import { toast } from 'react-toastify';
 
-// ⬇️ 날짜 형식 보정
+const leisureSites = ['스토리앤미디어', '미블', '디너의여왕', '레뷰'];
+
+// 날짜 문자열에 연도 추가 (MM.DD 또는 M/D -> YYYY-MM-DD)
 const addYearIfNeeded = (dateStr, fallbackYear) => {
-  const match = dateStr.match(/^\d{1,2}[\/.]\d{1,2}$/);
-  if (match) {
-    const [month, day] = dateStr.split(/[\/.]/).map(v => v.padStart(2, '0'));
-    const year = fallbackYear || new Date().getFullYear();
-    return `${year}-${month}-${day}`;
+  const m = dateStr.match(/\d{1,2}[\/.]\d{1,2}$/);
+  if (m) {
+    const [mo, da] = dateStr.split(/[\/.]/).map(v => v.padStart(2, '0'));
+    const yr = fallbackYear || new Date().getFullYear();
+    return `${yr}-${mo}-${da}`;
   }
   return dateStr;
 };
 
-// ⬇️ 기존 데이터 유지하며 병합
+// 이전 값이 비어 있을 때만 파싱 결과 적용
 const mergeParsedData = (prev, parsed) => {
-  const newData = {};
-  for (const key in parsed) {
-    if ((!prev[key] || prev[key] === '') && parsed[key]) {
-      newData[key] = parsed[key];
-    }
+  const out = {};
+  for (const k in parsed) {
+    if ((!prev[k] || prev[k] === '') && parsed[k]) out[k] = parsed[k];
   }
-  return newData;
+  return out;
 };
 
-// ⬇️ 체험 종료일 계산
-const getExperienceEnd = (site, startDateStr) => {
-  if (!startDateStr) return '';
-  const daysMap = {
-    '강남맛집': 21, '리뷰노트': 13, '디너의여왕': 14,
-    '레뷰': 19, '스토리앤미디어': 20, '미블': 11
+// 체험 기간 종료일 계산 (사이트별 고정 일수)
+const getExperienceEnd = (site, start) => {
+  if (!start) return '';
+  const map = {
+    '강남맛집': 21,
+    '리뷰노트': 13,
+    '디너의여왕': 14,
+    '레뷰': 19,
+    '스토리앤미디어': 20,
+    '미블': 11
   };
-  const days = daysMap[site] || 0;
-  if (!days) return '';
-  const d = new Date(startDateStr);
-  d.setDate(d.getDate() + days);
+  const d = new Date(start);
+  d.setDate(d.getDate() + (map[site] || 0));
   return d.toISOString().split('T')[0];
 };
 
-// ⬇️ 전체 폼 컴포넌트
-function ExperienceForm({ selectedExperience }) {
-  const [formData, setFormData] = useState({
-    company: '', region: '', siteUrl: '', siteName: '',
-    naverPlaceUrl: '', announcementDate: '', experienceStart: '', experienceEnd: '',
-    competitionRatio: '', selected: null, providedItems: '', additionalInfo: '',
-    extractedText: '', type: 'home', isClip: false, isFamily: false, isPetFriendly: false,
-    isLeisure: false, regionFull: '',
-  });
+// "시·도 시·군·구" 두 단계만 추출 (예: 서울 중랑)
+const extractDistrict = address => {
+  const parts = address.split(/\s+/);
+  if (parts.length < 2) return address;
+  const province = parts[0].replace(/(특별시|광역시|도)$/, '');
+  const district = parts[1].replace(/(시|군|구)$/, '');
+  return `${province} ${district}`;
+};
 
+export default function ExperienceForm({ selectedExperience, onSelect }) {
+  const [formData, setFormData] = useState({
+    company: '',
+    region: '',
+    regionFull: '',
+    siteUrl: '',
+    siteName: '',
+    naverPlaceUrl: '',
+    announcementDate: '',
+    experienceStart: '',
+    experienceEnd: '',
+    competitionRatio: '',
+    selected: null,            // null = 대기, true = 선정, false = 미선정
+    providedItems: '',
+    additionalInfo: '',
+    extractedText: '',
+    type: 'home',
+    isClip: false,
+    isFamily: false,
+    isPetFriendly: false,
+    isLeisure: false,
+  });
   const [isLoading, setIsLoading] = useState(false);
 
   const siteMapping = {
@@ -70,273 +92,289 @@ function ExperienceForm({ selectedExperience }) {
     'https://mrble.net/': '미블',
   };
 
-  // ⬇️ 복붙된 URL 자동 처리
+  // 편집 모드: 기존 데이터 로드, 신규 모드: 초기화
   useEffect(() => {
-    const text = formData.extractedText?.trim();
-    if (!text) return;
-    if (/^https?:\/\//.test(text)) {
-      if (/naver\.me|map\.naver\.com/i.test(text)) {
-        handleNaverUrl(text, { showLoading: true });
+    if (selectedExperience) {
+      setFormData({ ...selectedExperience });
+    } else {
+      resetForm();
+    }
+  }, [selectedExperience]);
+
+  // 복붙 추출란에 URL/텍스트 붙여넣기 시 자동 처리 (onBlur에서도 동작)
+  useEffect(() => {
+    const t = formData.extractedText.trim();
+    if (!t) return;
+    if (/^https?:\/\//.test(t)) {
+      if (/naver\.me|map\.naver\.com/.test(t)) {
+        handleNaverUrl(t, true);
       } else {
-        setFormData(prev => ({ ...prev, siteUrl: text, extractedText: '' }));
-        setTimeout(() => handleSiteUrl(text, { showLoading: true }), 0);
+        setFormData(p => ({ ...p, siteUrl: t, extractedText: '' }));
+        setTimeout(() => handleSiteUrl(t, true), 0);
       }
     }
   }, [formData.extractedText]);
 
-  // ⬇️ 기존 항목 로딩
+  // 업체명 입력 시 네이버 플레이스 자동 채움
   useEffect(() => {
-    if (selectedExperience) setFormData(prev => ({ ...prev, ...selectedExperience }));
-  }, [selectedExperience]);
-
-  // ⬇️ 네이버 자동채움
-  useEffect(() => {
-    if (formData.company && !formData.naverPlaceUrl) {
-      fetch(`/api/naver-place?name=${encodeURIComponent(formData.company)}`)
-        .then(res => res.json())
-        .then(({ url }) => url && setFormData(prev => ({ ...prev, naverPlaceUrl: url })))
-        .catch(console.error);
-    }
+    if (!formData.company) return;
+    const endpoint = process.env.NEXT_PUBLIC_NAVER_PLACE_FUNCTION_URL || '/api/naver-place';
+    fetch(`${endpoint}?name=${encodeURIComponent(formData.company)}`)
+      .then(res => res.json())
+      .then(({ url }) => {
+        if (url && url !== formData.naverPlaceUrl) {
+          setFormData(p => ({ ...p, naverPlaceUrl: url }));
+        }
+      })
+      .catch(err => console.error('네이버 플레이스 fetch 에러:', err));
   }, [formData.company]);
 
-  // ⬇️ 수동 입력 처리 (텍스트)
+  // 수동 복붙 텍스트 파싱
   const handleManualExtract = () => {
-    const text = formData.extractedText?.trim();
-    if (!text) return;
-    if (/^https?:\/\//.test(text)) {
-      if (/naver\.me|map\.naver\.com/i.test(text)) {
-        handleNaverUrl(text, { showLoading: false });
-      } else {
-        handleSiteUrl(text, { showLoading: false });
-      }
-      return;
+    const t = formData.extractedText.trim();
+    if (!t) return;
+    if (/^https?:\/\//.test(t)) {
+      if (/naver\.me|map\.naver\.com/.test(t)) return handleNaverUrl(t, false);
+      return handleSiteUrl(t, false);
     }
+
     setIsLoading(true);
-    const lowered = text.toLowerCase();
-    let siteName = '', parsed = {};
-    if (lowered.includes('reviewnote') || lowered.includes('리뷰노트')) {
-      siteName = '리뷰노트'; parsed = parseReviewNoteText(text);
-    } else if (lowered.includes('939au0g4vj8sq') || lowered.includes('강남맛집')) {
-      siteName = '강남맛집'; parsed = parseGangnamText(text);
-    } else if (lowered.includes('storyn.kr') || lowered.includes('스토리앤미디어')) {
-      siteName = '스토리앤미디어'; parsed = parseStorynText(text);
+    const l = t.toLowerCase();
+    let siteName = '';
+    let parsed = {};
+
+    if (l.includes('리뷰노트')) {
+      siteName = '리뷰노트';
+      parsed = parseReviewNoteText(t);
+    } else if (l.includes('강남맛집')) {
+      siteName = '강남맛집';
+      parsed = parseGangnamText(t);
+    } else if (l.includes('스토리앤미디어')) {
+      siteName = '스토리앤미디어';
+      parsed = parseStorynText(t);
     }
-    const [experienceStart, experienceEnd] = parsed.experiencePeriod?.split('~').map(s => addYearIfNeeded(s.trim())) || [];
-    const announcementDate = parsed.announcementDate ? parseAnnouncementDate(parsed.announcementDate) : (experienceStart ? new Date(new Date(experienceStart).setDate(new Date(experienceStart).getDate() - 1)).toISOString().split('T')[0] : '');
-    const autoEnd = getExperienceEnd(siteName, experienceStart);
+
+    const [start] = parsed.experiencePeriod?.split('~').map(s => addYearIfNeeded(s.trim())) || [];
+    let ann = parsed.announcementDate ? parseAnnouncementDate(parsed.announcementDate) : '';
+    if (!ann && start) {
+      const d = new Date(start);
+      d.setDate(d.getDate() - 1);
+      ann = d.toISOString().split('T')[0];
+    }
+    const autoEnd = getExperienceEnd(siteName, start);
+    const full = parsed.regionFull || '';
+    const short = full ? extractDistrict(full) : parsed.region || '';
+
+    // 신규 등록 시에만 isLeisure 자동 설정
+    const isLeisureAuto = leisureSites.includes(siteName);
+
     setFormData(prev => ({
       ...prev,
       ...mergeParsedData(prev, parsed),
-      region: parsed.region || prev.region,
-      regionFull: parsed.regionFull || prev.regionFull,
-      siteName: !prev.siteName ? siteName : prev.siteName,
-      experienceStart: experienceStart || prev.experienceStart,
-      experienceEnd: experienceEnd || autoEnd || prev.experienceEnd,
-      announcementDate: announcementDate || prev.announcementDate,
+      siteName: prev.siteName || siteName,
+      experienceStart: prev.experienceStart || start,
+      experienceEnd: prev.experienceEnd || autoEnd,
+      announcementDate: prev.announcementDate || ann,
+      regionFull: full,
+      region: short,
       extractedText: '',
+      ...(selectedExperience ? {} : { isLeisure: isLeisureAuto }),
     }));
     setIsLoading(false);
-    toast.success('요들의 외침! 수동 분석 완료! 🧠', { autoClose: 2000 });
+
+    toast.success('요들의 외침! 수동 분석 완료! 🧠', {
+      toastId: 'manual-extract',
+      autoClose: 2000
+    });
   };
 
-  const handleSiteUrl = async (url, options = { showLoading: false }) => {
-    if (options.showLoading) setIsLoading(true);
-    const matched = Object.entries(siteMapping).find(([prefix]) => url.startsWith(prefix));
-    const detectedSiteName = matched?.[1] || '';
+  // 사이트 URL 자동 파싱
+  const handleSiteUrl = async (url, showLoading) => {
+    if (showLoading) setIsLoading(true);
+    const match = Object.entries(siteMapping).find(([p]) => url.startsWith(p));
+    const siteName = match?.[1] || '';
     const raw = await fetchHtmlFromUrl(url);
-    const rawText = raw.text || '';
+    const txt = raw.text || '';
     let parsed = {};
-    if (detectedSiteName === '리뷰노트') {
-      parsed = parseReviewNoteText(rawText);
-    } else if (detectedSiteName === '강남맛집') {
-      parsed = parseGangnamText(rawText);
-    } else if (detectedSiteName === '스토리앤미디어') {
-      parsed = parseStorynText(rawText);
+
+    if (siteName === '리뷰노트') parsed = parseReviewNoteText(txt);
+    else if (siteName === '강남맛집') parsed = parseGangnamText(txt);
+    else if (siteName === '스토리앤미디어') parsed = parseStorynText(txt);
+
+    const [start] = parsed.experiencePeriod?.split('~').map(s => addYearIfNeeded(s.trim())) || [];
+    let ann = parsed.announcementDate ? parseAnnouncementDate(parsed.announcementDate) : '';
+    if (!ann && start) {
+      const d = new Date(start);
+      d.setDate(d.getDate() - 1);
+      ann = d.toISOString().split('T')[0];
     }
-  
-    // ✅ 날짜 추출
-    let experienceStart = '', experienceEnd = '', announcementDate = '';
-    if (parsed.experiencePeriod) {
-      const periodArray = parsed.experiencePeriod.split('~').map(s => s.trim());
-      if (periodArray.length === 2) {
-        const fallbackYear = formData.announcementDate 
-          ? formData.announcementDate.split('-')[0] 
-          : new Date().getFullYear();
-        experienceStart = addYearIfNeeded(periodArray[0], fallbackYear);
-        experienceEnd = addYearIfNeeded(periodArray[1], fallbackYear);
-      }
-    }
-  
-    if (parsed.announcementDate) {
-      announcementDate = parseAnnouncementDate(parsed.announcementDate);
-    }
-  
-    // 🔥 이게 빠졌으면 무조건 넣어야 함!!
-    if (!announcementDate && experienceStart) {
-      const start = new Date(experienceStart);
-      start.setDate(start.getDate() - 1);
-      announcementDate = start.toISOString().split('T')[0];
-    }
-  
-    const autoEnd = getExperienceEnd(detectedSiteName, experienceStart);
-  
+    const autoEnd = getExperienceEnd(siteName, start);
+    const full = parsed.regionFull || '';
+    const short = full ? extractDistrict(full) : parsed.region || '';
+    const isLeisureAuto = leisureSites.includes(siteName);
+
     setFormData(prev => ({
       ...prev,
       siteUrl: url,
-      siteName: !prev.siteName ? detectedSiteName : prev.siteName,
+      siteName: prev.siteName || siteName,
       ...mergeParsedData(prev, parsed),
-      experienceStart: experienceStart || prev.experienceStart,
-      experienceEnd: experienceEnd || autoEnd || prev.experienceEnd,
-      announcementDate: announcementDate || prev.announcementDate,
+      experienceStart: prev.experienceStart || start,
+      experienceEnd: prev.experienceEnd || autoEnd,
+      announcementDate: prev.announcementDate || ann,
+      regionFull: full,
+      region: short,
       extractedText: '',
+      ...(selectedExperience ? {} : { isLeisure: isLeisureAuto }),
     }));
-  
-    if (options.showLoading) setIsLoading(false);
-    toast.success('사이트 URL 자동 처리 완료!', { autoClose: 2000 });
-  };
-  
+    if (showLoading) setIsLoading(false);
 
-  const handleNaverUrl = (url, options = { showLoading: false }) => {
-    if (options.showLoading) setIsLoading(true);
-    setFormData(prev => ({
-      ...prev,
-      naverPlaceUrl: url,
-      extractedText: '',
-    }));
-    if (options.showLoading) setIsLoading(false);
-    toast.success('네이버 플레이스 URL 자동 처리 완료!', { autoClose: 2000 });
+    toast.success('요들의 외침! 사이트 URL 자동 처리 완료!', {
+      toastId: 'site-url',
+      autoClose: 2000
+    });
   };
 
-  const handleChange = async (e) => {
-    const { name, type, value, checked } = e.target;
+  // 네이버 플레이스 URL 처리
+  const handleNaverUrl = (url, showLoading) => {
+    if (showLoading) setIsLoading(true);
+    setFormData(prev => ({ ...prev, naverPlaceUrl: url, extractedText: '' }));
+    if (showLoading) setIsLoading(false);
+
+    toast.success('요들의 외침! 네이버 플레이스 URL 자동 처리 완료!', {
+      toastId: 'naver-url',
+      autoClose: 2000
+    });
+  };
+
+  // 폼 입력 변경 핸들러
+  const handleChange = e => {
+    const { name, type, checked, value } = e.target;
+
+    // 선정 체크박스: checked → true, 해제 → null
     if (name === 'selected' && type === 'checkbox') {
-      setFormData(prev => ({ ...prev, selected: checked ? true : false }));
+      setFormData(prev => ({ ...prev, selected: checked ? true : null }));
       return;
     }
+
+    // 발표일: 다음날체험시작 자동 채움
     if (name === 'announcementDate') {
-      const nextDay = new Date(value);
-      nextDay.setDate(nextDay.getDate() + 1);
-      const isoStart = nextDay.toISOString().split('T')[0];
-      const autoEnd = getExperienceEnd(formData.siteName, isoStart);
+      const d = new Date(value);
+      d.setDate(d.getDate() + 1);
+      const iso = d.toISOString().split('T')[0];
+      const end = getExperienceEnd(formData.siteName, iso);
       setFormData(prev => ({
         ...prev,
         announcementDate: value,
-        experienceStart: prev.experienceStart || isoStart,
-        experienceEnd: prev.experienceEnd || autoEnd,
+        experienceStart: prev.experienceStart || iso,
+        experienceEnd: prev.experienceEnd || end,
       }));
       return;
     }
+
+    // 체험시작일: 종료일 자동 채움
     if (name === 'experienceStart') {
-      const autoEnd = getExperienceEnd(formData.siteName, value);
-      setFormData(prev => ({ ...prev, experienceStart: value, experienceEnd: autoEnd }));
+      const end = getExperienceEnd(formData.siteName, value);
+      setFormData(prev => ({ ...prev, experienceStart: value, experienceEnd: end }));
       return;
     }
+
+    // siteUrl 직접 입력 시: 파싱 없이 값만
     if (name === 'siteUrl') {
-      setIsLoading(true);
-      const matched = Object.entries(siteMapping).find(([prefix]) => value.startsWith(prefix));
-      const detectedSiteName = matched?.[1] || '';
-      const raw = await fetchHtmlFromUrl(value);
-      const rawText = raw.text || '';
-      let parsed = {};
-      if (detectedSiteName === '리뷰노트') {
-        parsed = parseReviewNoteText(rawText);
-      } else if (detectedSiteName === '강남맛집') {
-        parsed = parseGangnamText(rawText);
-      }
-      let experienceStart = '', experienceEnd = '', announcementDate = '';
-      if (parsed.experiencePeriod) {
-        const periodArray = parsed.experiencePeriod.split('~').map(s => s.trim());
-        if (periodArray.length === 2) {
-          const fallbackYear = formData.announcementDate 
-            ? formData.announcementDate.split('-')[0] 
-            : new Date().getFullYear();
-          experienceStart = addYearIfNeeded(periodArray[0], fallbackYear);
-          experienceEnd = addYearIfNeeded(periodArray[1], fallbackYear);
-        }
-      }
-      if (parsed.announcementDate) {
-        announcementDate = parseAnnouncementDate(parsed.announcementDate);
-      }
-      const autoEnd = getExperienceEnd(detectedSiteName, experienceStart);
-      setFormData(prev => ({
-        ...prev,
-        siteUrl: value,
-        siteName: !prev.siteName ? detectedSiteName : prev.siteName,
-        ...mergeParsedData(prev, parsed),
-        experienceStart: experienceStart || prev.experienceStart,
-        experienceEnd: experienceEnd || autoEnd || prev.experienceEnd,
-        announcementDate: announcementDate || prev.announcementDate,
-        extractedText: '',
-      }));
-      setIsLoading(false);
-      toast.success('사이트 URL 자동 처리 완료!', { autoClose: 2000 });
+      setFormData(prev => ({ ...prev, siteUrl: value }));
       return;
     }
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const handleSubmit = async (e) => {
+  // 저장 / 수정 처리
+  const handleSubmit = async e => {
     e.preventDefault();
+    const payload = {
+      ...formData,
+      selected: formData.selected === true ? true : null
+    };
+
+    if (!payload.naverPlaceUrl) {
+      toast.error('요들의 외침! 네이버 플레이스 URL이 필요합니다!', {
+        toastId: 'submit-error',
+        autoClose: 2000
+      });
+      return;
+    }
+
     try {
-      const updatedData = selectedExperience
-        ? { ...formData, selected: formData.selected === false ? '대기' : formData.selected }
-        : { ...formData, selected: '대기' };
-      if (!updatedData.naverPlaceUrl) {
-        toast.error('요들의 외침! 100% 일치하는 네이버 플레이스가 없는디용??🤨 직접 입력해!', { autoClose: 2000 });
-        return;
-      }
       if (selectedExperience) {
-        const ref = doc(db, 'experiences', selectedExperience.id);
-        await updateDoc(ref, updatedData);
-        toast.success('요들의 외침! 수정됨! 🙌', { autoClose: 2000 });
+        await updateDoc(doc(db, 'experiences', selectedExperience.id), payload);
+        toast.success('요들의 외침! 수정됨! 🙌', {
+          toastId: 'submit-success',
+          autoClose: 2000
+        });
       } else {
-        await addDoc(collection(db, 'experiences'), updatedData);
-        toast.success('요들의 외침! 저장됨! 🎉', { autoClose: 2000 });
+        await addDoc(collection(db, 'experiences'), payload);
+        toast.success('요들의 외침! 저장됨! 🎉', {
+          toastId: 'submit-success',
+          autoClose: 2000
+        });
       }
+      onSelect(null);
       resetForm();
-    } catch (error) {
-      console.error('저장 실패:', error);
-      toast.error('요들의 외침! 다시 시도해! 😞', { autoClose: 2000 });
+    } catch {
+      toast.error('요들의 외침! 다시 시도해! 😞', {
+        toastId: 'submit-fail',
+        autoClose: 2000
+      });
     }
   };
 
+  // 미선정 처리
   const handleUnselected = async () => {
+    const payload = { ...formData, selected: false };
     try {
-      const dataToSave = { ...formData, selected: '미선정' };
       if (selectedExperience) {
-        const ref = doc(db, 'experiences', selectedExperience.id);
-        await updateDoc(ref, dataToSave);
+        await updateDoc(doc(db, 'experiences', selectedExperience.id), payload);
       } else {
-        await addDoc(collection(db, 'experiences'), dataToSave);
+        await addDoc(collection(db, 'experiences'), payload);
       }
+      toast.success('요들의 외침! 🛑 미선정 처리 완료!', {
+        toastId: 'unselect',
+        autoClose: 2000
+      });
+      onSelect(null);
       resetForm();
-      toast.success('요들의 외침! 🛑 미선정 ㅆㅑ갈!', { autoClose: 2000 });
-    } catch (error) {
-      toast.error('요들의 외침! 다시 시도해! 😞', { autoClose: 2000 });
+    } catch {
+      toast.error('요들의 외침! 다시 시도해! 😞', {
+        toastId: 'unselect-fail',
+        autoClose: 2000
+      });
     }
   };
 
+  // 완료 처리
   const handleComplete = async () => {
+    const payload = { ...formData, selected: '완료' };
     try {
-      const dataToSave = { ...formData, selected: '완료' };
-      if (selectedExperience) {
-        const ref = doc(db, 'experiences', selectedExperience.id);
-        await updateDoc(ref, dataToSave);
-        toast.success('요들의 외침! 숙제끗! ✍', { autoClose: 2000 });
-      }
+      await updateDoc(doc(db, 'experiences', selectedExperience.id), payload);
+      toast.success('요들의 외침! 완료 처리되었습니다! ✍', {
+        toastId: 'complete',
+        autoClose: 2000
+      });
+      onSelect(null);
       resetForm();
-    } catch (error) {
-      toast.error('요들의 외침! 리뷰 완료 처리 실패!', { autoClose: 2000 });
+    } catch {
+      toast.error('요들의 외침! 완료 처리 실패!', {
+        toastId: 'complete-fail',
+        autoClose: 2000
+      });
     }
   };
 
+  // 폼 초기화
   const resetForm = () => {
     setFormData({
       company: '',
       region: '',
+      regionFull: '',
       siteUrl: '',
       siteName: '',
       naverPlaceUrl: '',
@@ -353,24 +391,22 @@ function ExperienceForm({ selectedExperience }) {
       isFamily: false,
       isPetFriendly: false,
       isLeisure: false,
-      regionFull: '',
     });
   };
 
-    return (
-    <div className="bg-white p-8 shadow-[0_6px_20px_rgba(0,0,0,0.1)] rounded-[20px] w-full space-y-6">
+  return (
+    <div className="bg-white p-8 shadow rounded-[20px] w-full space-y-6">
       {isLoading && (
-        <>
-          <div className="w-full">
-            <div className="h-1 bg-accentOrange animate-pulse"></div>
+        <div className="space-y-2">
+          <div className="h-1 bg-accentOrange animate-pulse" />
+          <div className="flex justify-center items-center">
+            <div className="w-5 h-5 border-2 border-accentOrange border-t-transparent rounded-full animate-spin" />
+            <span className="ml-2 text-accentOrange">불러오는 중...</span>
           </div>
-          <div className="flex items-center justify-center py-3">
-            <div className="w-5 h-5 border-2 border-accentOrange border-t-transparent rounded-full animate-spin"></div>
-            <span className="ml-2 text-accentOrange text-sm">불러오는 중...</span>
-          </div>
-        </>
+        </div>
       )}
       <form onSubmit={handleSubmit} className="space-y-6 text-sm">
+        {/* 입력 필드 */}
         <div className="grid grid-cols-2 gap-4">
           {[
             ['업체명', 'company'],
@@ -382,75 +418,78 @@ function ExperienceForm({ selectedExperience }) {
             ['발표일', 'announcementDate'],
             ['경쟁률', 'competitionRatio'],
             ['체험 시작일', 'experienceStart'],
-            ['체험 종료일', 'experienceEnd']
+            ['체험 종료일', 'experienceEnd'],
           ].map(([label, name]) => (
             <div key={name} className="flex flex-col">
               <label className="font-semibold mb-1">{label}</label>
               <input
-                type={(name === 'announcementDate' || name === 'experienceStart' || name === 'experienceEnd') ? 'date' : 'text'}
+                type={['announcementDate','experienceStart','experienceEnd'].includes(name) ? 'date' : 'text'}
                 name={name}
                 value={formData[name]}
                 onChange={handleChange}
-                required={['company', 'region', 'providedItems'].includes(name)}
-                className="p-3 rounded-md shadow-sm bg-white focus:ring-accentOrange focus:outline-none"
+                required={['company','region','providedItems'].includes(name)}
+                className="p-3 rounded shadow-sm bg-white focus:ring-accentOrange"
               />
-              {name === 'additionalInfo' && (
-                <small className="text-gray-500">★선택사항, 입력시 회색으로 표기</small>
-              )}
             </div>
           ))}
         </div>
+
+        {/* 복붙 추출란 */}
         <div>
-          <label className="font-semibold mb-1 block items-center">복붙 추출란</label>
+          <label className="font-semibold mb-1 block">복붙 추출란</label>
           <textarea
             name="extractedText"
             value={formData.extractedText}
             onChange={handleChange}
             onBlur={handleManualExtract}
-            placeholder="단순 복붙 강남맛집, 리뷰노트 구현 완료" 
-            className="w-full h-40 p-3 bg-yellow-100 text-xs rounded-md shadow-inner font-mono"
+            placeholder="URL 또는 복붙 텍스트"
+            className="w-full h-40 p-3 bg-yellow-100 text-xs rounded"
           />
         </div>
-        <div className="grid grid-cols-3 gap-3 text-sm">
+
+        {/* 옵션 체크박스 */}
+        <div className="grid grid-cols-3 gap-3">
           {[
-            ['선정됨', 'selected'],
-            ['클립형', 'isClip'],
-            ['가족용', 'isFamily'],
-            ['무쓰오케이', 'isPetFriendly'],
-            ['여가형', 'isLeisure']
-          ].map(([label, name]) => (
+            ['선정됨','selected'],
+            ['클립형','isClip'],
+            ['가족용','isFamily'],
+            ['반려동물','isPetFriendly'],
+            ['여가형','isLeisure'],
+          ].map(([label,name]) => (
             <label key={name} className="flex items-center gap-2">
               <input
                 type="checkbox"
                 name={name}
-                checked={formData[name] === true}
+                checked={formData[name]===true}
                 onChange={handleChange}
-                className="w-4 h-4"
+                className="rounded"
               />
               {label}
             </label>
           ))}
         </div>
+
+        {/* 액션 버튼 */}
         <div className="flex justify-between">
           <button
             type="button"
             onClick={handleUnselected}
-            className="bg-gray-300 text-gray-700 px-[18px] py-1 rounded-md hover:opacity-90 text-sm"
+            className="bg-gray-300 px-4 py-1 rounded"
           >
             미선정
           </button>
-          {selectedExperience && formData.selected === true && (
+          {selectedExperience && formData.selected===true && (
             <button
               type="button"
               onClick={handleComplete}
-              className="bg-green-500 text-white px-[18px] py-2 rounded-md hover:opacity-90 text-sm"
+              className="bg-green-500 px-4 py-1 rounded text-white"
             >
-              숙제끗
+              완료
             </button>
           )}
           <button
             type="submit"
-            className="bg-accentOrange text-white px-6 py-2 rounded-md hover:opacity-90 text-sm"
+            className="bg-accentOrange px-6 py-2 rounded text-white"
           >
             저장
           </button>
@@ -459,5 +498,3 @@ function ExperienceForm({ selectedExperience }) {
     </div>
   );
 }
-
-export default ExperienceForm;

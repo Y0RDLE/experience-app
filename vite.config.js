@@ -7,4 +7,7 @@ export default defineConfig({
   define: {
     'process.env': {}, // ✅ 환경변수 오류 방지
   },
+  server: {
+    port: 8888, // ✅ 여기에 원하는 포트 지정
+  },
 });
