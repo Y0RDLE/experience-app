@@ -8,12 +8,16 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "node server.js",
-    "clean": "rimraf build dist"
+    "start": "node server/server.js",
+    "clean": "rimraf build dist",
+    "crawl:place": "node scripts/crawlReviewPlace.js",
+    "crawl:xpath": "node scripts/crawlCampaignXPath.js",
+    "crawl:storyn": "node scripts/crawlStorynCampaign.js"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "axios": "^1.8.4",
+    "cheerio": "^1.0.0",
     "cors": "^2.8.5",
     "daisyui": "^5.0.16",
     "date-fns": "^4.1.0",
@@ -22,7 +26,7 @@
     "jsdom": "^26.0.0",
     "lucide-react": "^0.487.0",
     "node-fetch": "^3.3.2",
-    "puppeteer": "^24.6.1",
+    "puppeteer": "^24.7.2",
     "react": "^19.0.0",
     "react-calendar": "^5.1.0",
     "react-dom": "^19.0.0",

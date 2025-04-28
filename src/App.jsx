@@ -20,7 +20,19 @@ function App() {
           </Routes>
         </div>
       </div>
-      <ToastContainer position="bottom-center" autoClose={2000} />
+
+      <ToastContainer
+        position="bottom-center"
+        autoClose={2000}
+        hideProgressBar={false}
+        closeOnClick
+        pauseOnHover={false}
+        closeButton={false}
+        icon
+        theme="light"
+        toastClassName="!w-auto !min-w-0 !max-w-max !px-3 !py-2 !rounded-lg !shadow-md !bg-white !border !border-gray-200"
+        bodyClassName="text-sm text-gray-800"
+      />
     </Router>
   );
 }
