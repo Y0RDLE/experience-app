@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { format, isToday, startOfDay } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import SelectedSticker from './SelectedSticker';
 
 const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick, gridTemplateColumns }) => {
@@ -44,7 +45,7 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick, 
           backgroundSize: '1500% 1500%',
         }}
       >
-        {format(date, 'M/d')}
+        {format(date, 'M/d', { locale: ko })}
       </span>
     );
   };
@@ -145,7 +146,7 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick, 
                       </a>
                     </div>
                     <div className="text-center">
-                      {annDate ? (isToday(annDate) ? renderHighlightedText(annDate) : <span>{format(annDate, 'M/d')}</span>) : ''}
+                      {annDate ? (isToday(annDate) ? renderHighlightedText(annDate) : <span>{format(annDate, 'M/d(eee)', { locale: ko })}</span>) : ''}
                     </div>
                     <div className="text-center">
                       {exp.experienceStart && exp.experienceEnd ? (
