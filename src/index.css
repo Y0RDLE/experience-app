@@ -12,6 +12,21 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: 'OmniGulim';
+  src: url('/fonts/210옴니굴림OTF030.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'OmniGulim';
+  src: url('/fonts/210옴니굴림OTF050.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+
 /* Tailwind CSS 기본 디렉티브 */
 @tailwind base;
 @tailwind components;
@@ -57,4 +72,30 @@ html, body, #root {
 /* placeholder 줄바꿈 스타일 (클래스명: your-input-class) */
 .your-input-class::placeholder {
   white-space: pre-line;
+}
+
+/* 토스트 전체 박스 스타일 */
+.Toastify__toast {
+  font-family: 'TmoneyRoundWind', sans-serif !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  color: #111 !important;
+  line-height: 1.4 !important;
+}
+
+/* 텍스트를 약간 위로 올리기 (아이콘보다 살짝 위 정렬) */
+.Toastify__toast--success {
+  display: flex;
+  align-items: center;
+}
+
+.Toastify__toast--success svg {
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.Toastify__toast--success::after {
+  content: '';
+  display: inline-block;
+  transform: translateY(-1px);
 }

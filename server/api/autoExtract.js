@@ -1,47 +1,55 @@
 import express from 'express';
-import fetch from 'node-fetch';
-import { load } from 'cheerio';
-import { parseReviewNoteText }  from '../parsers/parseReviewNoteText.js';
-import { parseGANGNAMText }     from '../parsers/parseGANGNAMText.js';
-import { parseReviewPlaceText } from '../parsers/parseReviewPlaceText.js';
-import { parseStorynText }      from '../parsers/parseStorynText.js';
-import { parseGenericText }     from '../parsers/parseGenericText.js';
+import puppeteer from 'puppeteer';
 
 const router = express.Router();
 
-// GET /api/autoExtract?url=<campaign_url>
-router.get('/autoExtract', async (req, res) => {
+router.get('/api/autoExtract', async (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).json({ error: 'Missing url parameter' });
 
-  let html;
+  let browser;
   try {
-    const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
-    html = await resp.text();
-  } catch (err) {
-    console.error('[AutoExtract • fetch HTML error]', err);
-    return res.status(500).json({ error: 'Failed to fetch page HTML' });
-  }
+    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'networkidle2' });
 
-  // Cheerio로 본문 텍스트나 HTML 로딩 (각 파서 내부에서 load 사용)
-  try {
-    let data;
-    if (url.includes('reviewnote.co.kr')) {
-      data = parseReviewNoteText(html);
-    } else if (url.includes('xn--939au0g4vj8sq.net')) {
-      data = parseGANGNAMText(html);
-    } else if (url.includes('reviewplace.co.kr')) {
-      data = parseReviewPlaceText(html);
-    } else if (url.includes('storyn.kr')) {
-      data = parseStorynText(html);
-    } else {
-      data = parseGenericText(html);
-    }
-    return res.json(data);
+    const data = await page.evaluate(() => {
+      // dt 텍스트에 포함된 키워드로 dt 찾고, 다음 dd.textContent 리턴
+      const pickDd = (label) => {
+        const dtList = Array.from(document.querySelectorAll('dt'));
+        const dt = dtList.find(d => d.textContent.trim().includes(label));
+        if (!dt) return '';
+        const dd = dt.nextElementSibling;
+        return dd ? dd.textContent.trim() : '';
+      };
+
+      const company       = document.querySelector('h1.campaign-title')?.textContent.trim() || '';
+      const providedItems = pickDd('제공서비스/물품');
+      const regionFull    = pickDd('방문 주소');
+      const regionParts   = regionFull.split(/\s+/);
+      const region        = regionParts.length >= 2 ? regionParts.slice(0,2).join(' ') : '';
+
+      // th → td 구조에서 뽑아내기 (기존 그대로)
+      const pickTd = (label) => {
+        const thList = Array.from(document.querySelectorAll('th'));
+        const th = thList.find(t => t.textContent.includes(label));
+        if (!th) return '';
+        const td = th.nextElementSibling;
+        return td ? td.textContent.trim() : '';
+      };
+      const experiencePeriod = pickTd('체험단 신청기간');
+      const announcementDate = pickTd('리뷰어 발표');
+      const competitionRatio = (pickDd('실시간 지원 현황').match(/지원\s*\d+\s*\/\s*모집\s*\d+/) || [''])[0];
+
+      return { company, region, regionFull, providedItems, experiencePeriod, announcementDate, competitionRatio };
+    });
+
+    res.json(data);
   } catch (err) {
-    console.error('[AutoExtract • parse error]', err);
-    return res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    if (browser) await browser.close();
   }
 });
 

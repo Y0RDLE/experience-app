@@ -1,7 +1,10 @@
 /* src/styles/fonts.css */
+
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
 @font-face {
-    font-family: 'TmoneyRoundWind';
-    src: url('/fonts/TmoneyRoundWindRegular.ttf') format('truetype');
-    font-weight: 400;
-    font-style: normal;
+  font-family: 'TmoneyRoundWind';
+  src: url('/fonts/TmoneyRoundWindRegular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
 }
