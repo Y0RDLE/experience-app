@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // Firebase 콘솔에서 제공한 구성 값 사용 (비공개 값은 .env 파일로 관리하는 것도 추천합니다)
@@ -12,12 +12,13 @@ const firebaseConfig = {
   appId: "1:910382507978:web:7a09d0c6db9d4c2763d133"
 };
 
+// ✅ Firebase 초기화
 const app = initializeApp(firebaseConfig);
-
-// Firebase 초기화 완료를 콘솔에 출력
 console.log("Firebase 초기화 완료");
 
+// 🔑 인증 및 Firestore 인스턴스 생성
 const auth = getAuth(app);
 const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
 
-export { auth, db };
+export { auth, db, provider };

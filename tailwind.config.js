@@ -15,6 +15,7 @@ module.exports = {
         cardBg: "#FFFFFF",
         hoverText: "#EB373E",
         lightOrange: "#F5D194",
+        scrollbar: "EEEEEE"
       },
       keyframes: {
         fadeInHighlight: {
@@ -29,11 +30,24 @@ module.exports = {
           '0%': { backgroundPosition: '0% 50%' },
           '100%': { backgroundPosition: '100% 50%' },
         },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-8px)' },
+        },
+        floatComplex: {
+          '0%': { transform: 'translate(0, 0) rotate(0deg)' },
+          '25%': { transform: 'translate(10px, -10px) rotate(5deg)' },
+          '50%': { transform: 'translate(-10px, 10px) rotate(-5deg)' },
+          '75%': { transform: 'translate(5px, -5px) rotate(3deg)' },
+          '100%': { transform: 'translate(0, 0) rotate(0deg)' },
+        },
       },
       animation: {
         fadeInHighlight: 'fadeInHighlight 0.1s infinite alternate',
         fadeInGradientSticker: 'fadeInGradientSticker 0.5s ease-out forwards',
         gradientText: 'gradientText 2.0s infinite alternate',
+        float: 'float 3s ease-in-out infinite',
+        floatComplex: 'floatComplex 4s linear infinite',
       },
     },
   },

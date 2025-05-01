@@ -1,15 +1,37 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import AppRouter from './router';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
-
-
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './firebase';
+import LoginForm from './components/LoginForm';
 
 function App() {
+  const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(true); // 초기 로딩 상태
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setChecking(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-customBg">
+        <div className="text-center animate-fadeInHighlight">
+          <img src="/google-icon.svg" className="w-12 h-12 mb-3 mx-auto" alt="로고" />
+          <p className="text-accentOrange text-base font-medium">뷰톡 시작 중...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
-      <AppRouter />
+      {user ? <AppRouter /> : <LoginForm />}
       <ToastContainer
         position="bottom-center"
         autoClose={2000}
