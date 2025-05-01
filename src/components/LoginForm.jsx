@@ -61,7 +61,7 @@ const LoginForm = () => {
         </div>
         <div className="absolute z-20 right-[-177px] top-[25%] animate-[floatComplex_3.2s_linear_infinite] [animation-delay:300ms]">
           <div className="bg-white px-2 py-1 rounded-xl shadow">
-            <FloatingIcon icon="/icons/카페인.ico" label="커피를 낋여오거라‼️‼️‼️" />
+            <FloatingIcon icon="/icons/독약.png" label="커피를 낋여오거라‼️‼️‼️" />
           </div>
         </div>
         <div className="absolute z-20 right-[-100px] bottom-[11%] animate-[floatComplex_4.5s_linear_infinite] [animation-delay:500ms]">

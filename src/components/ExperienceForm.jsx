@@ -49,6 +49,26 @@ const extractDistrict = address => {
   return `${province} ${district}`;
 };
 
+// 🔥 URL 보고 siteName 추출
+const getSiteNameFromUrl = (url) => {
+  let hostname = url;
+  try {
+    hostname = new URL(url).hostname.replace(/^www\./, '');
+  } catch (e) {
+    // URL parsing failed, fallback to raw string
+  }
+  // 도메인 기반 매칭
+  if (hostname.includes('reviewnote.co.kr')) return '리뷰노트';
+  if (hostname.includes('reviewplace.co.kr')) return '리뷰플레이스';
+  if (hostname.includes('xn--939au0g4vj8sq.net')) return '강남맛집';
+  if (hostname.includes('storyn.kr')) return '스토리앤미디어';
+  if (hostname.includes('mrblog.net')) return '미블';
+  if (hostname.includes('dinnerqueen.net')) return '디너의여왕';
+  if (hostname.includes('revu.net')) return '레뷰';
+  if (hostname.includes('popomon.com')) return '포포몬';
+  return '';
+};
+
 export default function ExperienceForm({ selectedExperience, onSelect }) {
   const [formData, setFormData] = useState({
     company: '',
@@ -79,94 +99,14 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
     else resetForm();
   }, [selectedExperience]);
 
-  // 복붙 추출란에 URL 입력 시 siteUrl 처리
-  useEffect(() => {
-    const t = formData.extractedText.trim();
-    if (!t) return;
-    if (/^https?:\/\//.test(t)) {
-      if (/naver\.me|map\.naver\.com/.test(t)) {
-        handleNaverUrl(t, true);
-      } else {
-        setFormData(p => ({ ...p, siteUrl: t, extractedText: '' }));
-        setTimeout(() => handleSiteUrl(t, true), 0);
-      }
-    }
-  }, [formData.extractedText]);
-
-  // 회사명 변경 시 네이버 플레이스 자동 조회
-  useEffect(() => {
-    if (!formData.company) return;
-    const endpoint = process.env.NEXT_PUBLIC_NAVER_PLACE_FUNCTION_URL || '/api/naver-place';
-    fetch(`${endpoint}?name=${encodeURIComponent(formData.company)}`)
-      .then(res => res.json())
-      .then(({ url }) => {
-        if (url && url !== formData.naverPlaceUrl) {
-          setFormData(p => ({ ...p, naverPlaceUrl: url }));
-        }
-      })
-      .catch(err => console.error('네이버 플레이스 fetch 에러:', err));
-  }, [formData.company]);
-
-  const handleManualExtract = () => {
-    const t = formData.extractedText.trim();
-    if (!t) return;
-    setIsLoading(true);
-
-    const parsed = parseReviewNoteText(t);
-    const siteName = '리뷰노트';
-    const [startRaw] = parsed.experiencePeriod?.split('~').map(s => s.trim()) || [];
-    const start = addYearIfNeeded(startRaw);
-    let ann = parsed.announcementDate ? parseAnnouncementDate(parsed.announcementDate) : '';
-    if (!ann && start) {
-      const d = new Date(start);
-      d.setDate(d.getDate() - 1);
-      ann = d.toISOString().split('T')[0];
-    }
-    const autoEnd = getExperienceEnd(siteName, start);
-    const full = parsed.regionFull || '';
-    const short = full ? extractDistrict(full) : parsed.region || '';
-    const isLeisureAuto = leisureSites.includes(siteName);
-
-    setFormData(prev => ({
-      ...prev,
-      ...mergeParsedData(prev, parsed),
-      siteName,
-      experienceStart: prev.experienceStart || start,
-      experienceEnd: prev.experienceEnd || autoEnd,
-      announcementDate: prev.announcementDate || ann,
-      regionFull: full,
-      region: short,
-      extractedText: '',
-      ...(selectedExperience ? {} : { isLeisure: isLeisureAuto }),
-    }));
-    setIsLoading(false);
-    toast.success('요들의 외침! 수동 분석 완료! 🧠', { toastId: 'manual-extract', autoClose: 2000 });
-  };
-
+  // 사이트 URL 자동 처리
   const handleSiteUrl = async (url, showLoading) => {
     if (showLoading) setIsLoading(true);
-  
-    // 🔥 URL 보고 siteName 추출
-    const getSiteNameFromUrl = (url) => {
-      if (/reviewnote\.co\.kr/.test(url)) return '리뷰노트';
-      if (/reviewplace\.co\.kr/.test(url)) return '리뷰플레이스';
-      if (/xn--939au0g4vj8sq\.net/.test(url)) return '강남맛집';
-      if (/storyn\.kr/.test(url)) return '스토리앤미디어';
-      if (/mrblog\.net/.test(url)) return '미블';
-      if (/dinnerqueen\.net/.test(url)) return '디너의여왕';
-      if (/revu\.net/.test(url)) return '레뷰';
-      if (/popomon\.com/.test(url)) return '포포몬';
-      return '';
-    };
-  
     try {
       const resp = await fetch(`/api/autoExtract?url=${encodeURIComponent(url)}`);
       const data = await resp.json();
       if (data.error) throw new Error(data.error);
-  
-      // 🔥 siteName 우선순위: API가 준 siteName → 없으면 직접 추출
       const siteName = data.siteName || getSiteNameFromUrl(url);
-  
       setFormData(prev => ({
         ...prev,
         siteUrl: url,
@@ -175,8 +115,7 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
         extractedText: '',
         ...(selectedExperience ? {} : { isLeisure: leisureSites.includes(siteName) }),
       }));
-  
-      toast.success('요들의 외침! 사이트 URL 자동 처리 완료! 🧠', { toastId: 'site-url', autoClose: 2000 });
+      toast.success('요들의 외침! 사이트 URL 자동 처리 완료! 🧠', { toastId: 'site-url' });
     } catch (err) {
       console.error('autoExtract 실패:', err);
       toast.error('자동 처리 실패 ㅆㅑ갈!', { toastId: 'site-url-fail' });
@@ -278,29 +217,30 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
     }
   };
 
-const handleUnselected = async () => {
-  toast.dismiss();
-  const payload = { ...formData, selected: false };
-  setIsLoading(true);
-  try {
-    if (selectedExperience) {
-      await updateDoc(doc(db, 'experiences', selectedExperience.id), payload);
-    } else {
-      await addDoc(collection(db, 'experiences'), payload);
+  const handleUnselected = async () => {
+    toast.dismiss();
+    const payload = { ...formData, selected: false };
+    setIsLoading(true);
+    try {
+      if (selectedExperience) {
+        await updateDoc(doc(db, 'experiences', selectedExperience.id), payload);
+      } else {
+        await addDoc(collection(db, 'experiences'), payload);
+      }
+
+      // ✅ 반드시 try 끝에서만 성공 토스트 실행
+      toast.success('요들의 외침! 🛑 미선정 ㅆ ㅑ갈!', { toastId: 'unselect' });
+
+      onSelect(null);
+      resetForm();
+    } catch (err) {
+      console.error('🔥 미선정 처리 실패:', err);
+      // 중복 팝업 발생하는 에러 토스트 제거
+      // toast.error('요들의 외침! 다시 시도해! 😞', { toastId: 'unselect-fail' });
+    } finally {
+      setIsLoading(false);
     }
-
-    // ✅ 반드시 try 끝에서만 성공 토스트 실행
-    toast.success('요들의 외침! 🛑 미선정 ㅆ ㅑ갈!', { toastId: 'unselect' });
-
-    onSelect(null);
-    resetForm();
-  } catch (err) {
-    console.error('🔥 미선정 처리 실패:', err);
-    toast.error('요들의 외침! 다시 시도해! 😞', { toastId: 'unselect-fail' });
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
 
   const resetForm = () => {
