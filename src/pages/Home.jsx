@@ -1,3 +1,4 @@
+// src/pages/Home.jsx
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -6,56 +7,86 @@ import ExperienceForm from '@/components/ExperienceForm';
 import MainLayout from '@/layout/MainLayout';
 import Sidebar from '@/components/Sidebar';
 import ArchiveMiniSearchModal from '@/components/ArchiveMiniSearchModal';
+import useArchiveSearch from '@/hooks/useArchiveSearch';
 
 export default function Home() {
-  const [experiences, setExperiences] = useState([]);
   const [selectedExperience, setSelectedExperience] = useState(null);
   const [formKey, setFormKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // 전체 데이터는 데스크탑 리스트용으로 실시간 구독
+  const [allExperiences, setAllExperiences] = useState([]);
   useEffect(() => {
     const unsubscribe = onSnapshot(
       collection(db, 'experiences'),
-      snapshot => {
-        const docs = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setExperiences(docs);
+      snap => {
+        setAllExperiences(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       },
-      error => {
-        console.error('Firestore 구독 에러:', error);
-      }
+      err => console.error('Firestore 구독 에러:', err)
     );
     return () => unsubscribe();
   }, []);
 
+  // formKey 리셋(선택 해제 시)
   useEffect(() => {
     if (selectedExperience === null) {
       setFormKey(k => k + 1);
     }
   }, [selectedExperience]);
 
+  // 모바일용 검색 훅 (사이드바 검색창과 동일 로직)
+  const { results: searchResults, loading } = useArchiveSearch(searchQuery);
+
   return (
-    <MainLayout sidebar={<Sidebar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />}>
+    <MainLayout
+      // 사이드바은 데스크탑에서만
+      sidebar={
+        <Sidebar
+          className="hidden lg:flex"
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+        />
+      }
+    >
       <div className="max-w-[1800px] mx-auto px-6 py-0">
-        {/* 좁게 줄였을 때(모바일 포함) 오직 입력폼만 보이게 */}
+        {/* 📱 모바일: 검색창 + 현황표만 */}
         <div className="block lg:hidden pt-[48px]">
-          <ExperienceForm
-            key={formKey}
-            selectedExperience={selectedExperience}
-          />
+          {/* 검색창 */}
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="업체명·지역·사이트명 검색"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full p-3 border rounded shadow-sm focus:outline-none focus:ring-accentOrange"
+            />
+          </div>
+
+          {/* 로딩 인디케이터 */}
+          {loading ? (
+            <div className="flex justify-center py-10 text-gray-500">
+              검색 중...
+            </div>
+          ) : (
+            <ExperienceList
+              experiences={searchResults}
+              onSelect={exp => setSelectedExperience(exp)}
+            />
+          )}
         </div>
 
-        {/* 충분히 넓은 창에서는 현황표와 입력폼을 좌우로 나란히 */}
-        <div className="hidden lg:grid lg:grid-cols-12 gap-12 items-start pt-[48px] relative">
-          <section className="lg:col-span-8 lg:mt-[-42px] relative z-[10]">
+        {/* 🖥 데스크탑: 사이드바 + 리스트 + 폼 */}
+        <div className="hidden lg:grid lg:grid-cols-12 gap-12 items-start pt-[48px]">
+          {/* 리스트 */}
+          <section className="lg:col-span-8 lg:mt-[-42px]">
             <ExperienceList
-              experiences={experiences}
+              experiences={allExperiences}
               onSelect={exp => setSelectedExperience(exp)}
             />
           </section>
-          <section className="lg:col-span-4 relative z-[20]">
+
+          {/* 입력폼 */}
+          <section className="lg:col-span-4">
             <ExperienceForm
               key={formKey}
               selectedExperience={selectedExperience}
@@ -64,7 +95,11 @@ export default function Home() {
         </div>
       </div>
 
-      <ArchiveMiniSearchModal searchQuery={searchQuery} onClose={() => {}} />
+      {/* 공통: 검색 모달 */}
+      <ArchiveMiniSearchModal
+        searchQuery={searchQuery}
+        onClose={() => {}}
+      />
     </MainLayout>
   );
 }

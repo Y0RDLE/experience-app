@@ -99,3 +99,66 @@ html, body, #root {
   display: inline-block;
   transform: translateY(-1px);
 }
+
+.tag-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.625rem; /* text-[10px] */
+  font-weight: 500;
+  color: #333;
+  border-radius: 9999px;        /* pill-shape */
+  background-image:
+    url('/heart.svg'),          /* 하트 패턴 */
+    linear-gradient(135deg, var(--badge-color)66, var(--badge-color)44);
+  background-repeat: repeat, no-repeat;
+  background-blend-mode: multiply;
+  box-shadow:
+    inset 0 0 2px rgba(255,255,255,0.6),
+    0 0 4px var(--badge-color)80;
+  transition:
+    transform 150ms ease-out,
+    box-shadow 150ms ease-out,
+    opacity 300ms ease-out;
+  opacity: 0;                   /* slideUpFade 전 투명 */
+}
+
+/* ── 태그 배지 스타일 추가 ── */
+.tag-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.625rem; /* 10px */
+  font-weight: 500;
+  color: #333;
+  border-radius: 9999px; /* pill-shape */
+  background-image:
+    url('/heart.svg'),
+    linear-gradient(135deg, var(--badge-color)66, var(--badge-color)44);
+  background-repeat: repeat, no-repeat;
+  background-blend-mode: multiply;
+  box-shadow:
+    inset 0 0 2px rgba(255,255,255,0.6),
+    0 0 4px var(--badge-color)80;
+  transition:
+    transform 150ms ease-out,
+    box-shadow 150ms ease-out,
+    opacity 300ms ease-out;
+  opacity: 0;
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(10px) scale(1); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-slideUpFade {
+  animation: slideUpFade 0.4s ease-out forwards;
+  opacity: 1 !important;
+}
+
+.tag-badge:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow:
+    inset 0 0 2px rgba(255,255,255,0.6),
+    0 6px 12px var(--badge-color)80;
+}

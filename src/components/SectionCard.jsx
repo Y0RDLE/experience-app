@@ -1,94 +1,122 @@
+// src/components/SectionCard.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { format, isToday } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import SelectedSticker from '../SelectedSticker';
 
-const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }) => {
-  const [showProvidedItems, setShowProvidedItems] = useState(null);
-  const borderRadius = 20;
+export default function SectionCard({
+  title,
+  headerColor = '#F5D194',
+  items = [],
+  onItemClick
+}) {
+  const [hoveredId, setHoveredId] = useState(null);
   const rowRefs = useRef({});
-
-  const handleMouseEnter = (id) => setShowProvidedItems(id);
-  const handleMouseLeave = () => setShowProvidedItems(null);
-
-  const renderTags = (exp) => {
-    const tags = [];
-    if (exp.isClip) tags.push('클립');
-    if (exp.isFamily) tags.push('가족용');
-    if (exp.isPetFriendly) tags.push('반려동물');
-    return tags.map((tag, idx) => (
-      <span
-        key={idx}
-        className="ml-2 px-1.5 py-[1px] text-[11px] rounded-full bg-[#FFEFDB] text-[#F49D85] font-semibold whitespace-nowrap"
-      >
-        {tag}
-      </span>
-    ));
-  };
 
   useEffect(() => {
     items.forEach(exp => {
-      if (!rowRefs.current[exp.id]) {
-        rowRefs.current[exp.id] = React.createRef();
-      }
+      if (!rowRefs.current[exp.id]) rowRefs.current[exp.id] = React.createRef();
     });
   }, [items]);
 
-  const renderHighlightedText = (date) => (
+  const renderTags = exp => (
+    <div className="flex ml-1 space-x-1 font-omni"> {/* font-omni 전체에 적용 */}
+      {exp.isClip && (
+        <span
+          className="
+            px-2 text-[10px] font-medium
+            text-white whitespace-nowrap
+            transform -rotate-2
+          "
+          style={{
+            background: 'repeating-linear-gradient(45deg, #FF8C00, #FF8C00 4px, #FFA040 4px, #FFA040 8px)',
+            borderRadius: '4px 12px 4px 12px',
+            boxShadow: '0 2px 3px rgba(146, 141, 141, 0.2)',
+          }}
+        >
+          클립
+        </span>
+      )}
+      {exp.isFamily && (
+        <span
+          className="
+            px-2 text-[10px] font-medium
+            text-white whitespace-nowrap
+            transform rotate-1
+          "
+          style={{
+            background: 'repeating-linear-gradient(45deg, #6A5ACD, #6A5ACD 4px, #8470FF 4px, #8470FF 8px)',
+            borderRadius: '12px 4px 12px 4px',
+            boxShadow: '0 2px 3px rgba(150, 139, 139, 0.2)',
+          }}
+        >
+          가족용
+        </span>
+      )}
+      {exp.isPetFriendly && (
+        <span
+          className="
+            px-2 text-[10px] font-medium
+            text-white whitespace-nowrap
+            transform -rotate-1
+          "
+          style={{
+            background: 'repeating-linear-gradient(45deg, #FF69B4, #FF69B4 4px, #FF85C1 4px, #FF85C1 8px)',
+            borderRadius: '4px 12px 4px 12px',
+            boxShadow: '0 2px 3px rgba(153, 139, 139, 0.2)',
+          }}
+        >
+          반려동물
+        </span>
+      )}
+    </div>
+  );
+
+
+  
+
+  const renderHighlight = (date, fmt) => (
     <span
-      className="font-bold text-transparent bg-clip-text animate-gradientText whitespace-nowrap inline-block align-middle"
+      className="font-bold text-transparent bg-clip-text animate-gradientText inline-block"
       style={{
-        backgroundImage: 'linear-gradient(270deg, rgb(255, 0, 0), rgba(255, 65, 65, 0.48), rgb(255, 0, 0))',
-        backgroundSize: '1500% 1500%',
-        letterSpacing: '0',
+        backgroundImage: 'linear-gradient(270deg, #FFC000, #FF5733, #FFC000)',
+        backgroundSize: '200% 200%',
       }}
     >
-      {format(date, 'M/d(eee)', { locale: ko })}
+      {format(date, fmt, { locale: ko })}
     </span>
   );
 
-  const renderHighlightedDateNoWeekday = (date) => (
-    <span
-      className="font-bold text-transparent bg-clip-text animate-gradientText whitespace-nowrap inline-block align-middle"
-      style={{
-        backgroundImage: 'linear-gradient(270deg, rgb(255, 0, 0), rgba(255, 65, 65, 0.48), rgb(255, 0, 0))',
-        backgroundSize: '1500% 1500%',
-        letterSpacing: '0',
-      }}
-    >
-      {format(date, 'M/d')}
-    </span>
-  );
-
-  const gridTemplate = 'minmax(220px, auto) repeat(5, 1fr)';
+  const gridCols = 'minmax(220px, auto) repeat(5, 1fr)';
 
   return (
-    <div style={{ minWidth: '960px', fontSize: '90%', marginLeft: '-8px' }}>
+    <div style={{ minWidth: 960, fontSize: '90%', marginLeft: -8 }}>
       <div
-        className="relative bg-white rounded shadow-[0_4px_12px_rgba(0,0,0,0.06)] border overflow-visible w-full"
-        style={{ borderColor: headerColor, borderRadius: `${borderRadius}px` }}
+        className="relative bg-white rounded shadow-lg border overflow-visible w-full"
+        style={{ borderColor: headerColor, borderRadius: 20 }}
       >
+        {/* 헤더 */}
         <div
           className="absolute top-0 left-0 right-0 h-[78px] rounded-t-[18px]"
           style={{ backgroundColor: headerColor, zIndex: 0 }}
         />
         <div className="relative z-10">
           <div
-            className="px-5 py-3 font-extrabold flex justify-between items-center"
+            className="px-5 py-3 flex justify-between items-center font-extrabold text-white"
             style={{
               backgroundColor: headerColor,
-              borderTopLeftRadius: `${borderRadius}px`,
-              borderTopRightRadius: `${borderRadius}px`,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
             }}
           >
-            <h2 className="text-[18px] text-white">{title}</h2>
-            <span className="text-xs text-white">총 {items.length}건</span>
+            <h2 className="text-lg">{title}</h2>
+            <span className="text-xs">총 {items.length}건</span>
           </div>
           <div
-            className="grid px-5 py-2.5 text-[11px] font-semibold text-white gap-4"
-            style={{ backgroundColor: headerColor, gridTemplateColumns: gridTemplate }}
+            className="grid px-5 py-2.5 gap-4 text-xs font-semibold text-white"
+            style={{ backgroundColor: headerColor, gridTemplateColumns: gridCols }}
           >
-            <div className="text-left pl-3">업체명</div>
+            <div className="pl-3 text-left">업체명</div>
             <div className="text-center">지역</div>
             <div className="text-center">사이트</div>
             <div className="text-center">발표일</div>
@@ -97,41 +125,49 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
           </div>
         </div>
 
+        {/* 리스트 */}
         {items.length === 0 ? (
-          <div className="p-5 text-center text-gray-400 text-sm">데이터가 없습니다.</div>
+          <div className="p-5 text-center text-gray-400 text-sm">
+            데이터가 없습니다.
+          </div>
         ) : (
-          items.map((exp, index) => {
-            const isHovered = showProvidedItems === exp.id;
-            const isLast = exp.id === items[items.length - 1]?.id;
-            const isFirst = index === 0;
-            const annDate = exp.announcementDate ? new Date(exp.announcementDate) : null;
-            const expStartDate = exp.experienceStart ? new Date(exp.experienceStart) : null;
-            const expEndDate = exp.experienceEnd ? new Date(exp.experienceEnd) : null;
+          items.map((exp, idx) => {
+            const isFirst = idx === 0;
+            const isLast = idx === items.length - 1;
+            const ann = exp.announcementDate && new Date(exp.announcementDate);
+            const start = exp.experienceStart && new Date(exp.experienceStart);
+            const end = exp.experienceEnd && new Date(exp.experienceEnd);
 
             return (
-              <div key={exp.id} ref={rowRefs.current[exp.id]} style={{ position: 'relative' }}>
-                {exp.selected === true && (
-                  <div style={{ position: 'absolute', top: 9, left: -28 }}>
+              <div
+                key={exp.id}
+                ref={rowRefs.current[exp.id]}
+                style={{ position: 'relative' }}
+              >
+                {exp.selected && (
+                  <div style={{ position: 'absolute', top: 8, left: -28 }}>
                     <SelectedSticker text="선정!" position="left" />
                   </div>
                 )}
                 <div
                   onClick={() => onItemClick?.(exp)}
-                  onMouseEnter={() => handleMouseEnter(exp.id)}
-                  onMouseLeave={handleMouseLeave}
-                  className={`group transition-all duration-150 cursor-pointer ${isFirst ? '' : 'border-t'}`}
+                  onMouseEnter={() => setHoveredId(exp.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  className={`group cursor-pointer transition-all duration-150 ${
+                    !isFirst && 'border-t'
+                  }`}
                   style={{ borderColor: headerColor }}
                 >
                   <div
-                    className="grid px-5 py-4 items-center leading-relaxed text-gray-800 group-hover:bg-[#FFF1E8] gap-4"
-                    style={{ gridTemplateColumns: gridTemplate }}
+                    className="grid px-5 py-4 items-center gap-4 text-gray-800 group-hover:bg-[#FFF1E8]"
+                    style={{ gridTemplateColumns: gridCols }}
                   >
-                    <div className="text-left flex flex-wrap items-center min-w-0 relative">
+                    <div className="flex items-center pl-3 min-w-0 overflow-hidden">
                       <a
                         href={exp.naverPlaceUrl || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline font-medium truncate max-w-full ml-3"
+                        className="truncate font-medium text-blue-600 hover:underline"
                       >
                         {exp.company}
                       </a>
@@ -149,36 +185,43 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
                       </a>
                     </div>
                     <div className="text-center">
-                      {annDate ? (
-                        isToday(annDate)
-                          ? renderHighlightedText(annDate)
-                          : <span>{format(annDate, 'M/d(eee)', { locale: ko })}</span>
-                      ) : ''}
+                      {ann
+                        ? isToday(ann)
+                          ? renderHighlight(ann, 'M/d(eee)')
+                          : (
+                            <span>
+                              {format(ann, 'M/d(eee)', { locale: ko })}
+                            </span>
+                          )
+                        : ''}
                     </div>
                     <div className="text-center">
-                      {expStartDate && expEndDate ? (
+                      {start && end ? (
                         <>
-                          {isToday(expStartDate)
-                            ? renderHighlightedDateNoWeekday(expStartDate)
-                            : format(expStartDate, 'M/d')}
+                          {isToday(start)
+                            ? renderHighlight(start, 'M/d')
+                            : format(start, 'M/d')}
                           &nbsp;~&nbsp;
-                          {isToday(expEndDate)
-                            ? renderHighlightedDateNoWeekday(expEndDate)
-                            : format(expEndDate, 'M/d')}
+                          {isToday(end)
+                            ? renderHighlight(end, 'M/d')
+                            : format(end, 'M/d')}
                         </>
-                      ) : ''}
+                      ) : (
+                        ''
+                      )}
                     </div>
-                    <div className="text-center">{exp.competitionRatio || '-'}</div>
+                    <div className="text-center">
+                      {exp.competitionRatio || '-'}
+                    </div>
                   </div>
 
-                  {isHovered && (
+                  {hoveredId === exp.id && (
                     <div
-                      className="px-5 py-2.5 border-t flex items-center text-sm group-hover:bg-[#FFF1E8]"
+                      className="px-5 py-2.5 flex items-center text-sm border-t bg-[#FFF1E8]"
                       style={{
                         borderColor: headerColor,
-                        backgroundColor: '#FFF1E8',
-                        borderBottomLeftRadius: isLast ? `${borderRadius}px` : '0',
-                        borderBottomRightRadius: isLast ? `${borderRadius}px` : '0',
+                        borderBottomLeftRadius: isLast ? 20 : 0,
+                        borderBottomRightRadius: isLast ? 20 : 0,
                       }}
                     >
                       <span className="text-[#EB373E] text-[13px]">
@@ -187,7 +230,9 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
                           <>
                             {exp.providedItems}
                             {exp.additionalInfo && (
-                              <span className="text-gray-500">&nbsp;... {exp.additionalInfo}</span>
+                              <span className="text-gray-500">
+                                &nbsp;... {exp.additionalInfo}
+                              </span>
                             )}
                           </>
                         ) : (
@@ -204,6 +249,4 @@ const SectionCard = ({ title, headerColor = '#F5D194', items = [], onItemClick }
       </div>
     </div>
   );
-};
-
-export default SectionCard;
+}

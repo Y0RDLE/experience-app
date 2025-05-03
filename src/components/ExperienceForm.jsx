@@ -49,24 +49,34 @@ const extractDistrict = address => {
   return `${province} ${district}`;
 };
 
-// 🔥 URL 보고 siteName 추출
+// 🔥 URL 보고 siteName 추출 (개선판)
 const getSiteNameFromUrl = (url) => {
-  let hostname = url;
   try {
-    hostname = new URL(url).hostname.replace(/^www\./, '');
+    // URL 객체에서 호스트네임만 분리
+    const hostname = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+
+    // 도메인 ↔ 사이트명 매핑
+    const mapping = {
+      'reviewnote.co.kr': '리뷰노트',
+      'reviewplace.co.kr': '리뷰플레이스',
+      'xn--939au0g4vj8sq.net': '강남맛집',
+      'storyn.kr': '스토리앤미디어',
+      'mrblog.net': '미블',
+      'dinnerqueen.net': '디너의여왕',
+      'revu.net': '레뷰',
+      'popomon.com': '포포몬',
+    };
+
+    // 정확히 키와 같거나, 서브도메인 포함해서 끝에 키가 붙은 경우
+    for (const domain in mapping) {
+      if (hostname === domain || hostname.endsWith(`.${domain}`)) {
+        return mapping[domain];
+      }
+    }
+    return '';  // 매핑 없으면 빈 문자열
   } catch (e) {
-    // URL parsing failed, fallback to raw string
+    return '';  // invalid URL
   }
-  // 도메인 기반 매칭
-  if (hostname.includes('reviewnote.co.kr')) return '리뷰노트';
-  if (hostname.includes('reviewplace.co.kr')) return '리뷰플레이스';
-  if (hostname.includes('xn--939au0g4vj8sq.net')) return '강남맛집';
-  if (hostname.includes('storyn.kr')) return '스토리앤미디어';
-  if (hostname.includes('mrblog.net')) return '미블';
-  if (hostname.includes('dinnerqueen.net')) return '디너의여왕';
-  if (hostname.includes('revu.net')) return '레뷰';
-  if (hostname.includes('popomon.com')) return '포포몬';
-  return '';
 };
 
 export default function ExperienceForm({ selectedExperience, onSelect }) {
@@ -130,7 +140,7 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
   
     if (name === 'siteUrl') {
       // 수동 siteUrl 변경
-      setFormData(prev => ({ ...prev, siteUrl: value }));
+      setFormData(prev => ({ ...prev, siteUrl: value, siteName: getSiteNameFromUrl(value) }));
       return;
     }
   
