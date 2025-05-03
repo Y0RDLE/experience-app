@@ -22,8 +22,8 @@ function App() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-customBg">
         <div className="text-center animate-fadeInHighlight">
-          <img src="/google-icon.svg" className="w-12 h-12 mb-3 mx-auto" alt="로고" />
-          <p className="text-accentOrange text-base font-medium">뷰톡 시작 중...</p>
+          <img src="/my-icon.png"   className="w-12 h-12 mb-3 mx-auto" alt="로고" />
+          <p className="text-accentOrange text-base font-medium">입장중...</p>
         </div>
       </div>
     );
