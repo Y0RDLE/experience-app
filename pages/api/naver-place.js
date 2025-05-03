@@ -1,8 +1,13 @@
-// 📁 pages/api/naver-place.js
+// functions/index.js 또는 Firebase에서 사용하는 endpoint 라우트
+import functions from 'firebase-functions';
+import express from 'express';
+import cors from 'cors';
+import { getNaverPlaceUrl } from './utils/naverCrawler.js';
 
-import { getNaverPlaceUrl } from '../../utils/naverCrawler';
+const app = express();
+app.use(cors({ origin: true }));
 
-export default async function handler(req, res) {
+app.get('/api/naver-place', async (req, res) => {
   const { name } = req.query;
   if (!name) return res.status(400).json({ error: 'Missing name' });
 
@@ -14,4 +19,6 @@ export default async function handler(req, res) {
     console.error('[Naver Place Error]', err);
     return res.status(500).json({ error: 'Internal error' });
   }
-}
+});
+
+export const api = functions.https.onRequest(app);

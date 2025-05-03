@@ -1,4 +1,3 @@
-// src/pages/Home.jsx
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -40,14 +39,23 @@ export default function Home() {
   return (
     <MainLayout sidebar={<Sidebar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />}>
       <div className="max-w-[1800px] mx-auto px-6 py-0">
-        <div className="grid grid-cols-12 gap-12 items-start pt-[48px]">
-          <section className="col-span-8 mt-[-42px]">
+        {/* 좁게 줄였을 때(모바일 포함) 오직 입력폼만 보이게 */}
+        <div className="block lg:hidden pt-[48px]">
+          <ExperienceForm
+            key={formKey}
+            selectedExperience={selectedExperience}
+          />
+        </div>
+
+        {/* 충분히 넓은 창에서는 현황표와 입력폼을 좌우로 나란히 */}
+        <div className="hidden lg:grid lg:grid-cols-12 gap-12 items-start pt-[48px] relative">
+          <section className="lg:col-span-8 lg:mt-[-42px] relative z-[10]">
             <ExperienceList
-              experiences={experiences} // ✅ 필터링 제거하고 원본 그대로 사용
+              experiences={experiences}
               onSelect={exp => setSelectedExperience(exp)}
             />
           </section>
-          <section className="col-span-4">
+          <section className="lg:col-span-4 relative z-[20]">
             <ExperienceForm
               key={formKey}
               selectedExperience={selectedExperience}
@@ -55,6 +63,7 @@ export default function Home() {
           </section>
         </div>
       </div>
+
       <ArchiveMiniSearchModal searchQuery={searchQuery} onClose={() => {}} />
     </MainLayout>
   );

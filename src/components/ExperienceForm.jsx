@@ -268,6 +268,26 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
     setIsLoading(false);
   };
 
+  useEffect(() => {
+    const fetchNaverPlaceUrl = async () => {
+      if (formData.company && !formData.naverPlaceUrl) {
+        try {
+          const res = await fetch(`http://localhost:5100/viewtalk-a3835/us-central1/api/api/naver-place?name=${encodeURIComponent(formData.company)}`);
+          const data = await res.json();
+          if (data.url) {
+            setFormData(prev => ({ ...prev, naverPlaceUrl: data.url }));
+            toast.success('요들의 외침! 플레이스 링크 자동완성! 🗺️', { toastId: 'auto-naver' });
+          }
+        } catch (err) {
+          console.warn('🔥 네이버플레이스 링크 자동완성 실패:', err);
+        }
+      }
+    };
+  
+    const delay = setTimeout(fetchNaverPlaceUrl, 800);
+    return () => clearTimeout(delay);
+  }, [formData.company, formData.naverPlaceUrl]);
+
   return (
     <div className="bg-white p-8 shadow rounded-[20px] w-full space-y-6">
       {isLoading && (
