@@ -1,0 +1,50 @@
+/* src/components/KakaoCalendar.css */
+.area_main {
+  width: 100%;
+}
+.row, .row_status {
+  display: flex;
+}
+.row_header .coulmn {
+  flex: 1; text-align: center;
+  background: #f1f3f4; color: #5f6368;
+  height: 36px; line-height: 36px;
+  border-bottom: 1px solid #e0e0e0;
+}
+.coulmn {
+  flex: 1; position: relative;
+  min-height: 120px; border: 1px solid #e0e0e0;
+}
+.coulmn.disabled {
+  background: #fafafa;
+}
+.txt_day {
+  display: block; padding: 4px;
+}
+.row_status {
+  margin-top: -120px;  /* 날짜 셀 높이와 동일 */
+}
+.coulmn_state {
+  flex: 1; position: relative; padding: 2px;
+}
+.box_state {
+  position: absolute; left: 2px; right: 2px;
+}
+.banner_state {
+  top: 2px;  /* 셀 상단 바로 */
+  height: 24px;
+  z-index: 2;
+}
+.box_filled {
+  top: 28px;  /* 배너 + 여유 */
+  height: 20px; margin-bottom: 2px;
+}
+.inner_state {
+  background: #ccc; color: #333;
+  padding: 2px 4px; font-size: 0.75rem;
+  border-radius: 2px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.inner_state.selected {
+  background: #34a853; color: #fff;
+}

@@ -1,28 +1,28 @@
-import React, { useEffect, useState } from 'react';
-import AppRouter from './router';
+import React, { useState, useEffect } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/firebase';
+import AppRouter from '@/router';
+import LoginForm from '@/components/LoginForm';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './firebase';
-import LoginForm from './components/LoginForm';
 
 function App() {
   const [user, setUser] = useState(null);
-  const [checking, setChecking] = useState(true); // 초기 로딩 상태
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
       setChecking(false);
     });
-    return () => unsubscribe();
+    return unsub;
   }, []);
 
   if (checking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-customBg">
         <div className="text-center animate-fadeInHighlight">
-          <img src="/my-icon.png"   className="w-12 h-12 mb-3 mx-auto" alt="로고" />
+          <img src="/my-icon.png" className="w-12 h-12 mb-3 mx-auto" alt="로고" />
           <p className="text-accentOrange text-base font-medium">입장중...</p>
         </div>
       </div>
@@ -39,7 +39,6 @@ function App() {
         closeOnClick
         pauseOnHover={false}
         closeButton={false}
-        icon
         theme="light"
         toastClassName="!w-auto !min-w-0 !max-w-max !px-3 !py-2 !rounded-lg !shadow-md !bg-white !border !border-gray-200"
         bodyClassName="text-sm text-gray-800"

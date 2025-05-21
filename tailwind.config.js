@@ -1,8 +1,13 @@
+// tailwind.config.js
 module.exports = {
   mode: 'jit',
   content: [
     "./index.html",
     "./src/**/*.{js,jsx}",
+  ],
+  safelist: [
+    { pattern: /^.*\[[^\]]+\].*$/ },  // 대괄호 임의값 포함 클래스 모두
+    { pattern: /^(opacity|ring|z)-\d+$/ }   // opacity-0, ring-2, z-20 등
   ],
   theme: {
     extend: {
@@ -48,6 +53,9 @@ module.exports = {
         gradientText: 'gradientText 2.0s infinite alternate',
         float: 'float 3s ease-in-out infinite',
         floatComplex: 'floatComplex 4s linear infinite',
+      },
+      minHeight: {
+        '120': '120px',
       },
     },
   },

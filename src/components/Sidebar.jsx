@@ -1,4 +1,3 @@
-// src/Sidebar.jsx
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { HomeIcon, CalendarIcon } from "lucide-react";
@@ -9,21 +8,14 @@ const Sidebar = ({ searchQuery, setSearchQuery }) => {
 
   return (
     <aside className="w-full h-full bg-white flex flex-col justify-between shadow-[0_6px_20px_rgba(0,0,0,0.1)] rounded-0">
-      {/* 상단 영역 */}
+      {/* 로고 + 검색 */}
       <div className="flex flex-col items-center px-[24px] pt-[48px] gap-10">
-        {/* 로고 영역: 기존 종 이모지를 /my-icon.png로 교체 */}
         <div className="flex flex-col items-center gap-2 mt-6 mb-4">
-          <img
-            src="/my-icon.png"
-            alt="Site Icon"
-            className="w-[90px] h-[90px]"  // 필요에 따라 크기를 조절하세요
-          />
+          <img src="/my-icon.png" alt="Site Icon" className="w-[90px] h-[90px]" />
           <span className="text-[35px] font-black text-black leading-none text-center">
             띵동~
           </span>
         </div>
-
-        {/* 검색창 */}
         <div className="relative w-full max-w-[200px]">
           <input
             type="text"
@@ -40,15 +32,10 @@ const Sidebar = ({ searchQuery, setSearchQuery }) => {
           <Link
             to="/"
             className={`no-underline flex items-center gap-4 w-full py-2 rounded-md text-[20px] font-semibold transition px-4 ${
-              location.pathname === "/"
-                ? "bg-accentOrange text-white"
-                : "text-[#5E5D6F] hover:bg-gray-100"
+              location.pathname === "/" ? "bg-accentOrange text-white" : "text-[#5E5D6F] hover:bg-gray-100"
             }`}
           >
-            <HomeIcon
-              size={24}
-              className={location.pathname === "/" ? "text-white" : "text-[#9B9AAD]"}
-            />
+            <HomeIcon size={24} className={location.pathname === "/" ? "text-white" : "text-[#9B9AAD]"} />
             <span className={location.pathname === "/" ? "text-white" : "text-[#5E5D6F]"}>
               홈
             </span>
@@ -57,15 +44,10 @@ const Sidebar = ({ searchQuery, setSearchQuery }) => {
           <Link
             to="/calendar"
             className={`no-underline flex items-center gap-4 w-full py-2 rounded-md text-[20px] font-semibold transition px-4 ${
-              location.pathname === "/calendar"
-                ? "bg-accentOrange text-white"
-                : "text-[#5E5D6F] hover:bg-gray-100"
+              location.pathname === "/calendar" ? "bg-accentOrange text-white" : "text-[#5E5D6F] hover:bg-gray-100"
             }`}
           >
-            <CalendarIcon
-              size={24}
-              className={location.pathname === "/calendar" ? "text-white" : "text-[#9B9AAD]"}
-            />
+            <CalendarIcon size={24} className={location.pathname === "/calendar" ? "text-white" : "text-[#9B9AAD]"} />
             <span className={location.pathname === "/calendar" ? "text-white" : "text-[#5E5D6F]"}>
               캘린더
             </span>
@@ -73,7 +55,7 @@ const Sidebar = ({ searchQuery, setSearchQuery }) => {
         </nav>
       </div>
 
-      {/* 하단 영역 */}
+      {/* 푸터 */}
       <div className="text-xs text-gray-400 text-left px-[20px] py-[15px] mt-auto">
         © yordle's grace
       </div>

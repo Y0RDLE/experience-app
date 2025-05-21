@@ -1,4 +1,3 @@
-// src/components/ArchiveSearchSection.jsx
 import React, { useState } from 'react';
 import useArchiveSearch from '@/hooks/useArchiveSearch';
 import ArchiveEditModal from './ArchiveEditModal';
@@ -9,21 +8,23 @@ const ArchiveSearchSection = ({ searchQuery }) => {
 
   return (
     <div className="mt-8">
-      {loading && <div className="text-gray-500">검색 중...</div>}
+      {loading && <div className="text-center text-gray-500">검색 중…</div>}
 
-      {!loading && results.length === 0 && (
-        <div className="text-gray-500">검색 결과가 없습니다.</div>
+      {!loading && !results.length && (
+        <div className="text-center text-gray-500">검색 결과가 없습니다.</div>
       )}
 
-      <div className="space-y-2">
+      <div className="mt-4 space-y-2 max-h-64 overflow-auto">
         {results.map((item) => (
           <div
             key={item.id}
             onClick={() => setEditingItem(item)}
-            className="p-3 border rounded cursor-pointer hover:bg-gray-50"
+            className="p-3 border rounded hover:bg-gray-50 cursor-pointer transition"
           >
             <div className="font-semibold text-sm">{item.company}</div>
-            <div className="text-xs text-gray-500">{item.region} · {item.siteName}</div>
+            <div className="text-xs text-gray-500">
+              {item.region} · {item.siteName}
+            </div>
           </div>
         ))}
       </div>
@@ -39,10 +40,7 @@ const ArchiveSearchSection = ({ searchQuery }) => {
               [name]: type === 'checkbox' ? checked : value,
             }));
           }}
-          onSave={() => {
-            // 저장 로직은 ArchiveEditModal 내부에서 처리
-            setEditingItem(null);
-          }}
+          onSave={() => setEditingItem(null)}
         />
       )}
     </div>

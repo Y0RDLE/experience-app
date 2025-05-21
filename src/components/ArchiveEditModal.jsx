@@ -30,7 +30,6 @@ const ArchiveEditModal = ({ experience, onClose, onChange, onSave }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white rounded-xl shadow-lg w-[560px] max-w-[90%] p-6 relative">
-        {/* 제목 + 닫기 */}
         <div className="relative mb-4">
           <h2 className="text-xl font-bold text-center mt-[-2px]">체험단 정보 수정</h2>
           <button
@@ -41,7 +40,6 @@ const ArchiveEditModal = ({ experience, onClose, onChange, onSave }) => {
           </button>
         </div>
 
-        {/* 스크롤 영역: 스크롤바는 바깥 밀착, 내용은 안쪽 */}
         <div className="relative max-h-[70vh] overflow-y-auto custom-scroll mr-[-18px] pr-[18px]">
           <div className="space-y-4">
             {[
@@ -70,7 +68,6 @@ const ArchiveEditModal = ({ experience, onClose, onChange, onSave }) => {
               </div>
             ))}
 
-            {/* 체크박스 */}
             <div className="flex flex-wrap gap-4 pt-2">
               {[
                 ['선정됨', 'selected'],
@@ -94,7 +91,6 @@ const ArchiveEditModal = ({ experience, onClose, onChange, onSave }) => {
           </div>
         </div>
 
-        {/* 하단 버튼 */}
         <div className="flex justify-between mt-6 gap-3">
           <button
             className="px-4 py-2 rounded bg-red-100 text-sm text-red-600 hover:bg-red-200"
@@ -122,13 +118,13 @@ const ArchiveEditModal = ({ experience, onClose, onChange, onSave }) => {
       <style jsx>{`
         .custom-scroll {
           scrollbar-width: thin;
-          scrollbar-color: #CCCCCC transparent;
+          scrollbar-color: #cccccc transparent;
         }
         .custom-scroll::-webkit-scrollbar {
           width: 6px;
         }
         .custom-scroll::-webkit-scrollbar-thumb {
-          background-color: #CCCCCC;
+          background-color: #cccccc;
           border-radius: 9999px;
         }
         .custom-scroll::-webkit-scrollbar-track {

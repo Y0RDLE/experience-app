@@ -1,23 +1,23 @@
 import { useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/firebase';
+import { db } from '../firebase';
 import { toast } from 'react-toastify';
 
-export const useArchiveModal = () => {
+export default function useArchiveEdit() {
   const [editTarget, setEditTarget] = useState(null);
   const [editValues, setEditValues] = useState({});
 
-  const openModal = (experience) => {
+  const openEdit = (experience) => {
     setEditTarget(experience);
     setEditValues({ ...experience });
   };
 
-  const closeModal = () => {
+  const closeEdit = () => {
     setEditTarget(null);
     setEditValues({});
   };
 
-  const handleChange = (e) => {
+  const handleInputChange = (e) => {
     const { name, type, value, checked } = e.target;
     setEditValues((prev) => ({
       ...prev,
@@ -25,14 +25,14 @@ export const useArchiveModal = () => {
     }));
   };
 
-  const handleSave = async () => {
+  const saveEdit = async () => {
     if (!editTarget?.id) return;
     try {
       await updateDoc(doc(db, 'experiences', editTarget.id), editValues);
       toast.success('요들의 외침! 수정 성공! 🎯');
-      closeModal();
+      closeEdit();
     } catch (err) {
-      console.error(err);
+      console.error('수정 실패:', err);
       toast.error('요들의 외침! 수정 실패! 💥');
     }
   };
@@ -40,9 +40,9 @@ export const useArchiveModal = () => {
   return {
     editTarget,
     editValues,
-    openModal,
-    closeModal,
-    handleChange,
-    handleSave,
+    openEdit,
+    closeEdit,
+    handleInputChange,
+    saveEdit,
   };
-};
+}

@@ -1,61 +1,60 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import useArchiveSearch from '@/hooks/useArchiveSearch';
 import ArchiveEditModal from './ArchiveEditModal';
 
 const ArchiveMiniSearchModal = ({ searchQuery, onClose }) => {
   const { results, loading, triggered, setTriggered } = useArchiveSearch(searchQuery);
-  const [editingItem, setEditingItem] = React.useState(null);
+  const [editingItem, setEditingItem] = useState(null);
 
   useEffect(() => {
-    if (!triggered) onClose();
-  }, [triggered, onClose]);
+    if (!searchQuery || searchQuery.trim() === '') {
+      setTriggered(false);
+    }
+  }, [searchQuery]);
 
   if (!triggered) return null;
 
+  const handleClose = () => {
+    setEditingItem(null);
+    setTriggered(false);
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-      <div className="bg-white w-[760px] max-h-[80vh] px-6 pt-6 pb-4 rounded-[24px] shadow-2xl relative border border-gray-200 font-[GmarketSansMedium] overflow-hidden flex flex-col">
-
-        {/* 제목 + 닫기 버튼 위치 조정 */}
-        <div className="relative mb-4 px-1">
-          <h2 className="text-[19px] font-extrabold text-gray-900 text-center mt-[-8px]">
-            🔍 전체 검색 결과
-          </h2>
+      <div className="relative w-[760px] max-h-[80vh] overflow-hidden bg-white rounded-2xl p-6 shadow-2xl border border-gray-200 font-medium">
+        <div className="relative mb-4 pb-2 border-b border-gray-200">
+          <h2 className="text-center text-lg font-extrabold">🔍 전체 검색 결과</h2>
           <button
-            onClick={() => setTriggered(false)}
-            className="absolute top-[-6px] right-[-6px] text-gray-400 hover:text-gray-700 text-xl font-bold"
+            onClick={handleClose}
+            className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-700"
           >
             ✕
           </button>
         </div>
 
-        <div className="overflow-y-auto custom-scroll max-h-[calc(80vh-100px)] -mr-3 pr-3">
-          {loading && <div className="text-gray-500 text-sm text-center">검색 중...</div>}
-
+        <div className="overflow-y-auto pr-3 custom-scroll max-h-[calc(80vh-80px)]">
+          {loading && <div className="text-center text-sm text-gray-500">검색 중…</div>}
           {!loading && results.length === 0 && (
-            <div className="text-gray-400 text-sm text-center">검색 결과 없음</div>
+            <div className="text-center text-sm text-gray-400">검색 결과 없음</div>
           )}
 
-          <div className="grid grid-cols-2 gap-4 pb-4">
+          <div className="grid grid-cols-2 gap-4 py-2">
             {results.map((item) => {
               const isSelected = item.selected === true || item.selected === '완료';
               return (
                 <div
                   key={item.id}
                   onClick={() => setEditingItem(item)}
-                  className={`p-4 border rounded-[16px] shadow-sm hover:shadow-md transition cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#FEFAEE] border-[#F5D6AA]'
-                      : 'bg-white border-gray-200'
+                  className={`p-4 border rounded-lg shadow-sm hover:shadow-md transition cursor-pointer ${
+                    isSelected ? 'bg-[#FEFAEE] border-[#F5D6AA]' : 'bg-white border-gray-200'
                   }`}
                 >
-                  <div className="text-sm font-bold text-gray-800 mb-1">
-                    {item.company}
+                  <div className="mb-1 text-sm font-bold text-gray-800">{item.company}</div>
+                  <div className="mb-1 text-xs text-gray-500">
+                    {item.region} {item.siteName && `· ${item.siteName}`}
                   </div>
-                  <div className="text-xs text-gray-500 mb-1">
-                    {item.region} {!!item.siteName && `· ${item.siteName}`}
-                  </div>
-                  <div className="text-xs text-gray-700 mb-1 line-clamp-1">
+                  <div className="mb-1 text-xs text-gray-700 line-clamp-1">
                     🧺 {item.providedItems || '제공내역 없음'}
                   </div>
                   <div className="text-xs text-gray-400 line-clamp-1">
@@ -78,7 +77,9 @@ const ArchiveMiniSearchModal = ({ searchQuery, onClose }) => {
                 [name]: type === 'checkbox' ? checked : value,
               }));
             }}
-            onSave={() => setEditingItem(null)}
+            onSave={() => {
+              setEditingItem(null);
+            }}
           />
         )}
       </div>
@@ -86,13 +87,13 @@ const ArchiveMiniSearchModal = ({ searchQuery, onClose }) => {
       <style jsx>{`
         .custom-scroll {
           scrollbar-width: thin;
-          scrollbar-color: #CCCCCC transparent;
+          scrollbar-color: #cccccc transparent;
         }
         .custom-scroll::-webkit-scrollbar {
           width: 6px;
         }
         .custom-scroll::-webkit-scrollbar-thumb {
-          background-color: #CCCCCC;
+          background-color: #cccccc;
           border-radius: 9999px;
         }
         .custom-scroll::-webkit-scrollbar-track {

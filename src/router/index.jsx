@@ -1,29 +1,28 @@
-import React from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import React, { useState } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import MainLayout from '@/layout/MainLayout';
 import Home from '@/pages/Home';
 import CalendarPage from '@/pages/CalendarPage';
-import ArchivePage from '@/pages/ArchivePage';
 
-// 예시용 dummy data (실제 Firestore fetch로 대체 필요)
-const dummyArchive = [];
+export default function AppRouter() {
+  const [searchQuery, setSearchQuery] = useState('');
 
-const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <Home />, // ✅ 기존 Home.jsx로 복구
-  },
-  {
-    path: '/calendar',
-    element: <CalendarPage />,
-  },
-  {
-    path: '/archive',
-    element: <ArchivePage data={dummyArchive} />,
-  },
-]);
-
-const AppRouter = () => {
-  return <RouterProvider router={router} />;
-};
-
-export default AppRouter;
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <MainLayout
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+            />
+          }
+        >
+          <Route index element={<Home />} />
+          <Route path="calendar" element={<CalendarPage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
