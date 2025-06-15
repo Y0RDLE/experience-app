@@ -1,3 +1,7 @@
+// src/server/parsers/siteParsers.js
+import { parseReviewNoteText } from './parseReviewNoteText.js';
+import { parseGANGNAMText }     from './parseGANGNAMText.js';
+
 export const siteParsers = {
   'https://reviewplace.co.kr/': {
     extract: (html) => {
@@ -11,15 +15,8 @@ export const siteParsers = {
       const announcementDate = doc.querySelector('.announce-date-wrap .date')?.textContent || '';
       const competitionRatio = doc.querySelector('.user-info .applicants')?.textContent || '';
 
-      return {
-        company,
-        region,
-        providedItems,
-        experiencePeriod,
-        announcementDate,
-        competitionRatio,
-      };
-    },
+      return { company, region, providedItems, experiencePeriod, announcementDate, competitionRatio };
+    }
   },
 
   'https://www.reviewnote.co.kr/': {
@@ -34,50 +31,12 @@ export const siteParsers = {
       const announcementDate = doc.querySelector('.info-table .date:nth-of-type(2)')?.textContent || '';
       const competitionRatio = doc.querySelector('.info-table .status strong')?.textContent || '';
 
-      return {
-        company,
-        region,
-        providedItems,
-        experiencePeriod,
-        announcementDate,
-        competitionRatio,
-      };
-    },
+      return { company, region, providedItems, experiencePeriod, announcementDate, competitionRatio };
+    }
   },
 
-  'https://xn--939au0g4vj8sq.net/': {
-    extract: (html) => {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-
-      // ⛏ 강남맛집: 클래스 없는 div 중에서 지역 텍스트 찾기
-      const divs = doc.querySelectorAll('div');
-      let region = '';
-      for (const div of divs) {
-        const text = div.textContent.trim();
-        if (/^(경기|서울|인천|부산|대전|대구|광주|울산)/.test(text)) {
-          region = text;
-          break;
-        }
-      }
-
-      const company = doc.querySelector('.biz-name')?.textContent.trim() || '';
-      const providedItems = doc.querySelector('.product-desc')?.textContent.trim() || '';
-      const experiencePeriod = doc.querySelector('.period-box .date-range')?.textContent.trim() || '';
-      const announcementDate = doc.querySelector('.announce-box .announce-date')?.textContent.trim() || '';
-      const competitionRatio = doc.querySelector('.entry-status')?.textContent.trim() || '';
-      const naverPlaceUrl = doc.querySelector('a[href^="https://map.naver.com/v5/search"]')?.href || '';
-
-      return {
-        company,
-        region,
-        providedItems,
-        experiencePeriod,
-        announcementDate,
-        competitionRatio,
-        naverPlaceUrl,
-      };
-    },
+  'https://xn--939au0g4vj8sq.net/cp/': {
+    extract: (_html, text) => parseGANGNAMText(text)
   },
 
   'https://www.mrblog.net/': {
@@ -92,15 +51,8 @@ export const siteParsers = {
       const announcementDate = doc.querySelector('.schedule-box .announce')?.textContent || '';
       const competitionRatio = doc.querySelector('.summary-box .apply-status')?.textContent || '';
 
-      return {
-        company,
-        region,
-        providedItems,
-        experiencePeriod,
-        announcementDate,
-        competitionRatio,
-      };
-    },
+      return { company, region, providedItems, experiencePeriod, announcementDate, competitionRatio };
+    }
   },
 
   'https://popomon.com/': {
@@ -115,15 +67,8 @@ export const siteParsers = {
       const announcementDate = doc.querySelector('.announce-area .date')?.textContent || '';
       const competitionRatio = doc.querySelector('.apply-count .current')?.textContent || '';
 
-      return {
-        company,
-        region,
-        providedItems,
-        experiencePeriod,
-        announcementDate,
-        competitionRatio,
-      };
-    },
+      return { company, region, providedItems, experiencePeriod, announcementDate, competitionRatio };
+    }
   },
 
   'https://storyn.kr/': {
@@ -138,15 +83,8 @@ export const siteParsers = {
       const announcementDate = doc.querySelector('.announce-date')?.textContent || '';
       const competitionRatio = doc.querySelector('.applicant-box .count')?.textContent || '';
 
-      return {
-        company,
-        region,
-        providedItems,
-        experiencePeriod,
-        announcementDate,
-        competitionRatio,
-      };
-    },
+      return { company, region, providedItems, experiencePeriod, announcementDate, competitionRatio };
+    }
   },
 
   'https://chvu.co.kr/': {
@@ -161,15 +99,8 @@ export const siteParsers = {
       const announcementDate = doc.querySelector('.recruit-box .announce')?.textContent || '';
       const competitionRatio = doc.querySelector('.applicants .number')?.textContent || '';
 
-      return {
-        company,
-        region,
-        providedItems,
-        experiencePeriod,
-        announcementDate,
-        competitionRatio,
-      };
-    },
+      return { company, region, providedItems, experiencePeriod, announcementDate, competitionRatio };
+    }
   },
 
   'https://dinnerqueen.net/': {
@@ -184,14 +115,7 @@ export const siteParsers = {
       const announcementDate = doc.querySelector('.result-date')?.textContent || '';
       const competitionRatio = doc.querySelector('.applicant-info')?.textContent || '';
 
-      return {
-        company,
-        region,
-        providedItems,
-        experiencePeriod,
-        announcementDate,
-        competitionRatio,
-      };
-    },
-  },
+      return { company, region, providedItems, experiencePeriod, announcementDate, competitionRatio };
+    }
+  }
 };
