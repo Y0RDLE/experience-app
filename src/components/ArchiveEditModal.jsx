@@ -1,3 +1,4 @@
+// src/components/ArchiveEditModal.jsx
 import React from 'react';
 import { X } from 'lucide-react';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
@@ -11,6 +12,7 @@ const ArchiveEditModal = ({ experience, onClose, onChange, onSave }) => {
       const { id, ...rest } = experience;
       const ref = doc(db, 'experiences', id);
       await updateDoc(ref, rest);
+      // 부모에서 목록 갱신/모달 닫기 처리
       onSave();
     } catch (err) {
       console.error('Firestore 저장 실패:', err);
@@ -27,6 +29,17 @@ const ArchiveEditModal = ({ experience, onClose, onChange, onSave }) => {
     }
   };
 
+  // 복구: 완료 상태에서 현황표(선정 true)로 되돌림
+  const handleRestore = async () => {
+    try {
+      const ref = doc(db, 'experiences', experience.id);
+      await updateDoc(ref, { selected: true });
+      onSave();
+    } catch (err) {
+      console.error('복구 실패:', err);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white rounded-xl shadow-lg w-[560px] max-w-[90%] p-6 relative">
@@ -35,6 +48,7 @@ const ArchiveEditModal = ({ experience, onClose, onChange, onSave }) => {
           <button
             className="absolute top-[-6px] right-[-6px] text-gray-500 hover:text-gray-700"
             onClick={onClose}
+            aria-label="닫기"
           >
             <X size={20} />
           </button>
@@ -69,11 +83,13 @@ const ArchiveEditModal = ({ experience, onClose, onChange, onSave }) => {
             ))}
 
             <div className="flex flex-wrap gap-4 pt-2">
+              {/* 체크박스 순서: 선정됨 → 연장됨 → 무쓰오케이 → 클립형 → 가족용 → 여가형 */}
               {[
                 ['선정됨', 'selected'],
+                ['연장됨', 'extension'],
+                ['무쓰오케이', 'isPetFriendly'],
                 ['클립형', 'isClip'],
                 ['가족용', 'isFamily'],
-                ['무쓰오케이', 'isPetFriendly'],
                 ['여가형', 'isLeisure'],
               ].map(([label, name]) => (
                 <label key={name} className="flex items-center gap-2 text-sm">
@@ -92,12 +108,26 @@ const ArchiveEditModal = ({ experience, onClose, onChange, onSave }) => {
         </div>
 
         <div className="flex justify-between mt-6 gap-3">
-          <button
-            className="px-4 py-2 rounded bg-red-100 text-sm text-red-600 hover:bg-red-200"
-            onClick={handleDelete}
-          >
-            삭제
-          </button>
+          <div className="flex gap-2">
+            {/* 삭제 버튼 */}
+            <button
+              className="px-4 py-2 rounded bg-red-100 text-sm text-red-600 hover:bg-red-200"
+              onClick={handleDelete}
+            >
+              삭제
+            </button>
+
+            {/* 복구 버튼: 현재 문서가 '완료'로 표시되어 있을 경우에만 노출 */}
+            {experience.selected === '완료' && (
+              <button
+                className="px-4 py-2 rounded bg-green-100 text-sm text-green-700 hover:bg-green-200"
+                onClick={handleRestore}
+              >
+                복구
+              </button>
+            )}
+          </div>
+
           <div className="flex gap-3">
             <button
               className="px-4 py-2 rounded bg-gray-200 text-sm text-gray-700 hover:bg-gray-300"

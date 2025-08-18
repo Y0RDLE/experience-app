@@ -19,61 +19,86 @@ export default function SectionCard({
     });
   }, [items]);
 
-  const renderTags = exp => (
-    <div className="flex ml-1 space-x-1 font-omni"> {/* font-omni 전체에 적용 */}
-      {exp.isClip && (
-        <span
-          className="
-            px-2 text-[10px] font-medium
-            text-white whitespace-nowrap
-            transform -rotate-2
-          "
-          style={{
-            background: 'repeating-linear-gradient(45deg, #FF8C00, #FF8C00 4px, #FFA040 4px, #FFA040 8px)',
-            borderRadius: '4px 12px 4px 12px',
-            boxShadow: '0 2px 3px rgba(146, 141, 141, 0.2)',
-          }}
-        >
-          클립
-        </span>
-      )}
-      {exp.isFamily && (
-        <span
-          className="
-            px-2 text-[10px] font-medium
-            text-white whitespace-nowrap
-            transform rotate-1
-          "
-          style={{
-            background: 'repeating-linear-gradient(45deg, #6A5ACD, #6A5ACD 4px, #8470FF 4px, #8470FF 8px)',
-            borderRadius: '12px 4px 12px 4px',
-            boxShadow: '0 2px 3px rgba(150, 139, 139, 0.2)',
-          }}
-        >
-          가족용
-        </span>
-      )}
-      {exp.isPetFriendly && (
-        <span
-          className="
-            px-2 text-[10px] font-medium
-            text-white whitespace-nowrap
-            transform -rotate-1
-          "
-          style={{
-            background: 'repeating-linear-gradient(45deg, #FF69B4, #FF69B4 4px, #FF85C1 4px, #FF85C1 8px)',
-            borderRadius: '4px 12px 4px 12px',
-            boxShadow: '0 2px 3px rgba(153, 139, 139, 0.2)',
-          }}
-        >
-          반려동물
-        </span>
-      )}
-    </div>
-  );
+  // 개발용 디버그: 렌더 시 exp 구조 확인 (문제 해결 후 제거 가능)
+  useEffect(() => {
+    if (items && items.length) {
+      // 첫 3개만 찍어두자
+      console.log('SectionCard items sample:', items.slice(0, 3));
+    }
+  }, [items]);
 
-
-  
+  const renderTags = exp => {
+    // support both new and legacy field names
+    const isExtended = !!(exp.isExtended || exp.extension);
+    return (
+      <div className="flex ml-1 space-x-1 font-omni">
+        {isExtended && (
+          <span
+            className="
+              px-2 text-[10px] font-medium
+              text-white whitespace-nowrap
+              transform rotate-0
+            "
+            style={{
+              background: 'repeating-linear-gradient(45deg, #4DA0FF, #4DA0FF 4px, #6EC1FF 4px, #6EC1FF 8px)',
+              borderRadius: '8px 12px',
+              boxShadow: '0 2px 3px rgba(100, 140, 180, 0.18)',
+            }}
+          >
+            연장
+          </span>
+        )}
+        {exp.isClip && (
+          <span
+            className="
+              px-2 text-[10px] font-medium
+              text-white whitespace-nowrap
+              transform -rotate-2
+            "
+            style={{
+              background: 'repeating-linear-gradient(45deg, #FF8C00, #FF8C00 4px, #FFA040 4px, #FFA040 8px)',
+              borderRadius: '4px 12px 4px 12px',
+              boxShadow: '0 2px 3px rgba(146, 141, 141, 0.2)',
+            }}
+          >
+            클립
+          </span>
+        )}
+        {exp.isFamily && (
+          <span
+            className="
+              px-2 text-[10px] font-medium
+              text-white whitespace-nowrap
+              transform rotate-1
+            "
+            style={{
+              background: 'repeating-linear-gradient(45deg, #6A5ACD, #6A5ACD 4px, #8470FF 4px, #8470FF 8px)',
+              borderRadius: '12px 4px 12px 4px',
+              boxShadow: '0 2px 3px rgba(150, 139, 139, 0.2)',
+            }}
+          >
+            가족용
+          </span>
+        )}
+        {exp.isPetFriendly && (
+          <span
+            className="
+              px-2 text-[10px] font-medium
+              text-white whitespace-nowrap
+              transform -rotate-1
+            "
+            style={{
+              background: 'repeating-linear-gradient(45deg, #FF69B4, #FF69B4 4px, #FF85C1 4px, #FF85C1 8px)',
+              borderRadius: '4px 12px 4px 12px',
+              boxShadow: '0 2px 3px rgba(153, 139, 139, 0.2)',
+            }}
+          >
+            💗무쓰💗
+          </span>
+        )}
+      </div>
+    );
+  };
 
   const renderHighlight = (date, fmt) => (
     <span
@@ -95,7 +120,6 @@ export default function SectionCard({
         className="relative bg-white rounded shadow-lg border overflow-visible w-full"
         style={{ borderColor: headerColor, borderRadius: 20 }}
       >
-        {/* 헤더 */}
         <div
           className="absolute top-0 left-0 right-0 h-[78px] rounded-t-[18px]"
           style={{ backgroundColor: headerColor, zIndex: 0 }}
@@ -125,7 +149,6 @@ export default function SectionCard({
           </div>
         </div>
 
-        {/* 리스트 */}
         {items.length === 0 ? (
           <div className="p-5 text-center text-gray-400 text-sm">
             데이터가 없습니다.
@@ -153,9 +176,7 @@ export default function SectionCard({
                   onClick={() => onItemClick?.(exp)}
                   onMouseEnter={() => setHoveredId(exp.id)}
                   onMouseLeave={() => setHoveredId(null)}
-                  className={`group cursor-pointer transition-all duration-150 ${
-                    !isFirst && 'border-t'
-                  }`}
+                  className={`group cursor-pointer transition-all duration-150 ${!isFirst && 'border-t'}`}
                   style={{ borderColor: headerColor }}
                 >
                   <div
@@ -185,30 +206,16 @@ export default function SectionCard({
                       </a>
                     </div>
                     <div className="text-center">
-                      {ann
-                        ? isToday(ann)
-                          ? renderHighlight(ann, 'M/d(eee)')
-                          : (
-                            <span>
-                              {format(ann, 'M/d(eee)', { locale: ko })}
-                            </span>
-                          )
-                        : ''}
+                      {ann ? (isToday(ann) ? renderHighlight(ann, 'M/d(eee)') : <span>{format(ann, 'M/d(eee)', { locale: ko })}</span>) : ''}
                     </div>
                     <div className="text-center">
                       {start && end ? (
                         <>
-                          {isToday(start)
-                            ? renderHighlight(start, 'M/d')
-                            : format(start, 'M/d')}
+                          {isToday(start) ? renderHighlight(start, 'M/d') : format(start, 'M/d')}
                           &nbsp;~&nbsp;
-                          {isToday(end)
-                            ? renderHighlight(end, 'M/d')
-                            : format(end, 'M/d')}
+                          {isToday(end) ? renderHighlight(end, 'M/d') : format(end, 'M/d')}
                         </>
-                      ) : (
-                        ''
-                      )}
+                      ) : ('')}
                     </div>
                     <div className="text-center">
                       {exp.competitionRatio || '-'}

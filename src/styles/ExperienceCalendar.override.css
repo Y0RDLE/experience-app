@@ -1,0 +1,55 @@
+/* src/styles/ExperienceCalendar.override.css
+   - 컴포넌트에서 사용하는 .ec-* 접두사의 스타일 보강 및 전역 충돌 덮어쓰기용
+   - 이 파일을 프로젝트의 전역 CSS에 포함(혹은 import)해야 효과가 있음.
+*/
+
+.ec-root {
+  isolation: isolate; /* 스태킹 컨텍스트 격리로 z-index 충돌 최소화 */
+  box-sizing: border-box;
+}
+
+/* 날짜 영역 우선 표시 */
+.ec-root .ec-week-dates {
+  position: relative !important;
+  z-index: 30 !important;
+}
+
+/* 발표 박스 (날짜 안의 '📢') 우선 표시 */
+.ec-root .ec-announce {
+  position: relative !important;
+  z-index: 31 !important;
+  display: inline-block;
+}
+
+/* 이벤트 그리드(두번째 행)는 날짜보다 아래 */
+.ec-root .ec-week-events {
+  position: relative !important;
+  z-index: 10 !important;
+  pointer-events: auto;
+}
+
+/* 개별 이벤트(띠) */
+.ec-root .ec-event {
+  position: relative !important; /* grid 내 위치이므로 relative */
+  z-index: 11 !important; /* 날짜보다 낮음 */
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+/* 안전장치: 전역 .row/.coulmn 같은 규칙이 남아 있으면 캘린더 내부에서 비활성화 */
+.ec-root .row,
+.ec-root .row_status,
+.ec-root .coulmn,
+.ec-root .coulmn_state,
+.ec-root .box_state {
+  position: static !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: auto !important;
+}
