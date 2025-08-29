@@ -10,10 +10,21 @@ import { parseDINNERText } from '../../server/parsers/parseDINNERText';
 import { parseAnnouncementDate } from '../utils/parseDates';
 import { toast } from 'react-toastify';
 
-const START_OFFSET_BY_SITE = { '디너의여왕': 1, '스토리앤미디어': 1, '미블': 1 };
+const START_OFFSET_BY_SITE = {
+  '강남맛집': 1,         // ✅ 발표일 다음날 시작
+  '디너의여왕': 1,
+  '스토리앤미디어': 1,
+  '미블': 1
+};
+
 const DURATIONS_BY_SITE = {
-  '강남맛집': 21, '리뷰노트': 14, '리뷰플레이스': 16, '디너의여왕': 14,
-  '레뷰': 19, '스토리앤미디어': 21, '미블': 12
+  '강남맛집': 21,
+  '리뷰노트': 14,
+  '리뷰플레이스': 16,
+  '디너의여왕': 14,
+  '레뷰': 19,
+  '스토리앤미디어': 21,
+  '미블': 12
 };
 
 const addDaysISO = (iso, days) => {
@@ -22,10 +33,13 @@ const addDaysISO = (iso, days) => {
   d.setDate(d.getDate() + (days || 0));
   return d.toISOString().split('T')[0];
 };
+
+// ✅ 종료일 계산은 '시작일 포함' 기준으로 (기간-1)일을 더함 → 9/6 시작에 21일이면 9/26
 const getExperienceEnd = (site, startISO) => {
   if (!startISO) return '';
   const days = DURATIONS_BY_SITE[site] ?? 0;
-  return addDaysISO(startISO, days);
+  if (!days) return '';
+  return addDaysISO(startISO, days - 1);
 };
 
 // 지역 표준화
@@ -38,24 +52,32 @@ const formatRegion = (str) => {
   return [prov, dist].filter(Boolean).join(' ');
 };
 
-// ★ 경쟁률 최후 보정(폼단) — 어떤 복붙도 "N:M"으로 정리
+// ★ 경쟁률 최후 보정(폼단) — 어떤 복붙도 "N:M"으로 정리 (기존 값은 절대 비우지 않음)
 const normalizeCompetition = (txt) => {
   if (!txt) return '';
-  const src = String(txt).replace(/[\u00A0\u200B-\u200D\uFEFF]/g, ' ');
+  const src = String(txt).replace(/[\u00A0\u200B-\u200D\uFEFF]/g, ' ').trim();
 
+  // 1) "지원 1234 / 모집 20" 류
   let m = src.match(/지원[^\d]*([\d,]+)\s*[\-–—:|/~]?\s*[^\d]*모집[^\d]*([\d,]+)\s*명?/i);
   if (m) return `${m[1].replace(/,/g,'')}:${m[2].replace(/,/g,'')}`;
 
+  // 2) "지원 1234명 모집 20명" 분리 매칭
   const sup = src.match(/지원[^\d]*([\d,]+)\s*명?/i);
   const rec = src.match(/모집[^\d]*([\d,]+)\s*명?/i);
   if (sup && rec) return `${sup[1].replace(/,/g,'')}:${rec[1].replace(/,/g,'')}`;
 
+  // 3) "1234 / 20" (문맥 보조)
   const m2 = src.match(/(\d{1,3}(?:,\d{3})*)\s*\/\s*(\d{1,3}(?:,\d{3})*)/);
   if (m2 && /실시간\s*지원\s*현황|지원|모집/.test(src))
     return `${m2[1].replace(/,/g,'')}:${m2[2].replace(/,/g,'')}`;
 
+  // 4) "지원: 1234 ... 모집: 20"
   const m3 = src.match(/지원\s*[:\-]?\s*([\d,]+)[^\d]+모집\s*[:\-]?\s*([\d,]+)/i);
   if (m3) return `${m3[1].replace(/,/g,'')}:${m3[2].replace(/,/g,'')}`;
+
+  // 5) ✅ 이미 "N:M" 또는 "N-M"처럼 정규형으로 들어온 값 유지
+  const m4 = src.match(/^\s*(\d{1,3}(?:,\d{3})*)\s*[:\-]\s*(\d{1,3}(?:,\d{3})*)\s*$/);
+  if (m4) return `${m4[1].replace(/,/g,'')}:${m4[2].replace(/,/g,'')}`;
 
   return '';
 };
@@ -163,8 +185,15 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
       parsed.region = formatRegion(parsed.region);
       parsed.regionFull = parsed.regionFull || parsed.region;
     }
-    if (parsed.competitionRatio) parsed.competitionRatio = normalizeCompetition(parsed.competitionRatio);
-    if (!parsed.competitionRatio) parsed.competitionRatio = normalizeCompetition(raw); // ★ 최후 보정
+
+    // 경쟁률: 정규화 실패 시 원본 유지 (증발 방지)
+    if (parsed.competitionRatio) {
+      const norm = normalizeCompetition(parsed.competitionRatio);
+      parsed.competitionRatio = norm || String(parsed.competitionRatio);
+    } else {
+      const last = normalizeCompetition(raw);
+      if (last) parsed.competitionRatio = last;
+    }
 
     if (parsed.announcementDate) parsed.announcementDate = parseAnnouncementDate(parsed.announcementDate);
     if (parsed.experienceStart)  parsed.experienceStart  = parseAnnouncementDate(parsed.experienceStart);
@@ -195,8 +224,12 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
         data.region = formatRegion(rFull);
         data.regionFull = rFull;
       }
-      // 경쟁률도 폼단에서 한 번 더
-      if (data.competitionRatio) data.competitionRatio = normalizeCompetition(data.competitionRatio);
+
+      // 경쟁률도 폼단에서 한 번 더(실패 시 원본 보존)
+      if (data.competitionRatio) {
+        const norm = normalizeCompetition(data.competitionRatio);
+        data.competitionRatio = norm || String(data.competitionRatio);
+      }
 
       let patch = {};
       if (data.announcementDate) {
@@ -252,7 +285,12 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
       const normalized = {
         ...selectedExperience,
         region: formatRegion(selectedExperience.region || selectedExperience.regionFull || ''),
-        competitionRatio: normalizeCompetition(selectedExperience.competitionRatio || ''),
+        // ✅ 경쟁률 증발 방지: 정규화 실패 시 원본 유지
+        competitionRatio: (() => {
+          const raw = selectedExperience.competitionRatio || '';
+          const norm = normalizeCompetition(raw);
+          return norm || raw;
+        })(),
         isExtended: (selectedExperience.isExtended === true) || (selectedExperience.extension === true) || false,
       };
       setFormData({ ...normalized });
@@ -262,23 +300,27 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
 
   const handleChange = e => {
     const { name, type, checked, value } = e.target;
+
     if (name === 'siteUrl') {
       setFormData(prev => ({ ...prev, siteUrl: value, siteName: getSiteNameFromUrl(value) }));
       return;
     }
+
     if (name === 'announcementDate') {
       const iso = parseAnnouncementDate(value);
       const site = formData.siteName || '리뷰노트';
-      const patch = setDatesByAnnouncement(site, iso);
+      const patch = setDatesByAnnouncement(site, iso); // ✅ 강남맛집은 다음날 시작 + 21일-1
       setFormData(prev => ({ ...prev, ...patch }));
       return;
     }
+
     if (name === 'experienceStart') {
       const site = formData.siteName || '리뷰노트';
-      const end = getExperienceEnd(site, value);
+      const end = getExperienceEnd(site, value); // ✅ 종료일 = 시작 + (기간-1)
       setFormData(prev => ({ ...prev, experienceStart: value, experienceEnd: end }));
       return;
     }
+
     if (type === 'checkbox') setFormData(prev => ({ ...prev, [name]: checked }));
     else setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -305,7 +347,7 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
       return;
     }
 
-    toast.success(selectedExperience ? '수정 완료 🙌' : '저장 완료 🎉', { toastId: 'submit-success' });
+    toast.success(selectedExperience ? '수정끗 🙌' : '저장끗🎉', { toastId: 'submit-success' });
     onSelect(null);
     resetForm();
     setIsLoading(false);
@@ -314,7 +356,7 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
   const handleComplete = async () => {
     toast.dismiss();
     await updateDoc(doc(db, 'experiences', selectedExperience.id), { ...formData, selected: '완료' });
-    toast.success('숙제 완료 ✍', { toastId: 'complete' });
+    toast.success('숙제끗✍', { toastId: 'complete' });
     onSelect(null);
     resetForm();
   };
@@ -392,7 +434,7 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
               <input
                 type={['announcementDate', 'experienceStart', 'experienceEnd'].includes(name) ? 'date' : 'text'}
                 name={name}
-                value={formData[name]}
+                value={formData[name] ?? ''}
                 onChange={handleChange}
                 required={['company', 'region', 'providedItems'].includes(name)}
                 className="p-3 rounded shadow-sm bg-white focus:ring-accentOrange"
@@ -429,7 +471,7 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
             ['가족용', 'isFamily'],
             ['여가형', 'isLeisure'],
           ];
-          const colIndentPx = [2, 36, 45];
+          const colIndentPx = [2, 36, 45]; // ✅ 패딩 고정
           return (
             <div className="grid grid-cols-3 gap-3">
               {items.map(([label, name], idx) => {
