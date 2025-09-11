@@ -46,29 +46,21 @@ const formatCompetition = (txt) => {
 /* -------- URL만 깔끔히 뽑기: 괄호/따옴표/마침표 꼬리 제거 (개선版) -------- */
 const pickNaverPlace = (txt = '') => {
   const src = String(txt);
-
-  // 괄호·따옴표·꺾쇠 이전까지만 허용 → ")에서", "'에서" 같은 꼬리 자동 차단
   const RXES = [
     /(https?:\/\/naver\.me\/[^\s<>"'()]+)/i,
     /(https?:\/\/(?:m\.)?place\.naver\.com\/[^\s<>"'()]+)/i,
     /(https?:\/\/map\.naver\.com\/[^\s<>"'()]+)/i,
   ];
-
   let hit = '';
   for (const rx of RXES) {
     const m = src.match(rx);
     if (m && m[1]) { hit = m[1]; break; }
   }
   if (!hit) return '';
-
-  // 끝에 붙은 구두점 제거
   hit = hit.replace(/[.,;:!?…]+$/g, '');
-
-  // 여분 닫힘괄호가 남았으면 안전하게 제거
   while (hit.endsWith(')') && (hit.match(/\(/g)?.length || 0) < (hit.match(/\)/g)?.length || 0)) {
     hit = hit.slice(0, -1);
   }
-
   return hit;
 };
 
@@ -90,17 +82,25 @@ const nextMeaningful = (lines, fromIdx) => {
   return '';
 };
 
-/* -------- 업체명 노이즈 제거: "네이버 검색" 등 무시 -------- */
+/* -------- 업체명 노이즈 제거: "네이버 검색" & "사장님" 등 무시 -------- */
 const BAD_COMPANY_TOKENS = /(네이버\s*검색|검색\s*버튼|Naver\s*Search)/i;
+// 끝에 붙는 직함 꼬리 제거(사장/대표/원장/점장 + '님' + 선택적 한글이름 2~4자)
+const HONORIFIC_SUFFIX = /\s*(?:사장|대표|원장|점장)\s*님?(?:\s*[가-힣]{2,4})?\s*$/i;
+
 const cleanCompany = (s) => {
   if (!s) return '';
   // [서울/중랑구] 같은 프리픽스 제거
   let t = String(s).replace(/^\s*(?:\[[^\]]+\]\s*)+/g, '').trim();
+  // '주최자:' 프리픽스 제거
+  t = t.replace(/^주최자\s*[:\-]?\s*/i, '').trim();
   // 괄호 주석 중 "네이버 검색" 포함시 제거
   t = t.replace(/\s*\((?:.*?)네이버\s*검색(?:.*?)\)\s*$/i, '').trim();
-  // 끝에 붙은 "- 네이버 검색" 같은 꼬리 제거
+  // 끝에 붙은 "- 네이버 검색" 꼬리 제거
   t = t.replace(/\s*-\s*네이버\s*검색\s*$/i, '').trim();
   if (BAD_COMPANY_TOKENS.test(t)) return '';
+  // 직함 꼬리(사장님 등) 제거
+  t = t.replace(HONORIFIC_SUFFIX, '').trim();
+  // 의미 없는 섹션명 제거
   if (/^(블로그|인스타|유튜브)$/i.test(t)) return '';
   return t;
 };
@@ -110,7 +110,7 @@ function parseTextReviewNote(text) {
   const body = String(text || '');
   const lines = splitLines(body);
 
-  // 업체명: [서울/중랑구] 다음 텍스트 또는 제공내역 라인 근처 (네이버 검색 노이즈 무시)
+  // 업체명: [서울/중랑구] 다음 텍스트 또는 제공내역 라인 근처 (네이버 검색/사장님 노이즈 무시)
   let company = '';
   for (let i = 0; i < Math.min(lines.length, 12); i++) {
     if (/^\[.*?\]/.test(lines[i])) {
@@ -127,6 +127,14 @@ function parseTextReviewNote(text) {
         const s = cleanCompany(lines[j]);
         if (s && !/제공|방문|키워드|체험단/i.test(s)) { company = s; break; }
       }
+    }
+  }
+  // 주최자 블록 보강: "주최자\nOOO 사장님" 패턴
+  if (!company) {
+    const jx = lines.findIndex(l => /주최자/i.test(l));
+    if (jx !== -1) {
+      const cand = cleanCompany(nextMeaningful(lines, jx));
+      if (cand) company = cand;
     }
   }
 
@@ -152,7 +160,6 @@ function parseTextReviewNote(text) {
         const L = lines[k];
         if (!L) continue;
         if (breakers.test(L)) break;
-        // 가격/보상/세트성 키워드 완화
         if (/(만원|원|세트|메뉴|코스|리필|특선|2인|3인|코스요리|바우처|이용권|식사권)/.test(L)) bag.push(L);
         if (bag.length === 0) bag.push(L); // 한 줄만 있는 케이스 허용
       }
@@ -234,7 +241,7 @@ function parseHtmlReviewNote(html) {
     return norm(th.next('td').text());
   };
 
-  // 업체명 (네이버 검색 노이즈 제거 및 [지역] 프리픽스 제거)
+  // 업체명 (네이버 검색/사장님 노이즈 제거 및 [지역] 프리픽스 제거)
   let company =
     cleanCompany(norm($('h1.campaign-title').first().text())) ||
     cleanCompany(norm($('h2,h3').first().text()));
