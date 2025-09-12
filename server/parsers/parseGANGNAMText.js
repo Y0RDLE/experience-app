@@ -20,16 +20,12 @@ export function parseGANGNAMText(rawText = '') {
   const defaultRegionRaw = normSpaces(compMatch[1] || '');
   const company = normSpaces(compMatch[2] || '');
 
-  // 지역 정규화 유틸: [ ] / / 제거, 접미사 컷(특별시/광역시/도, 시/군/구), 잘린 브라켓 방지
+  // 지역 정규화
   const normalizeRegion = (input = '') => {
     if (!input) return '';
     let s = normSpaces(input);
-
-    // 괄호 패턴 처리: "[서울 동대문]"이면 내부만, "서울 동대문] ..."이면 ']' 이후 컷
-    s = s.replace(/^[^\[]*\[([^\]]+)\].*$/, '$1'); // 대괄호 내부만 추출
-    s = s.replace(/\].*$/, '');                   // 남은 닫힘괄호 및 뒤 꼬리 컷
-
-    // 구분자 정리
+    s = s.replace(/^[^\[]*\[([^\]]+)\].*$/, '$1');
+    s = s.replace(/\].*$/, '');
     s = s.replace(/\//g, ' ');
     s = s.replace(/\s+/g, ' ').trim();
 
@@ -37,19 +33,16 @@ export function parseGANGNAMText(rawText = '') {
     let prov = parts[0] || '';
     let dist = parts[1] || '';
 
-    // 접미사 컷
     prov = prov.replace(/(특별자치도|특별시|광역시|자치시|도)$/,'');
     dist = dist.replace(/(시|군|구)$/,'').replace(/]$/,'');
 
-    // 최소 "광역단위 + 기초(구/군/시)" 두 토큰 필요
     if (!prov || !dist) return '';
-
     return `${prov} ${dist}`.trim();
   };
 
   const defaultRegion = normalizeRegion(defaultRegionRaw);
 
-  /* ---------- 2) 제공내역: 업체명 바로 다음 줄 ---------- */
+  /* ---------- 2) 제공내역 ---------- */
   const providedItems = normSpaces(lines[compLineIdx + 1] || '');
 
   /* ---------- 3) 주소 & 축약 지역 ---------- */
@@ -57,20 +50,18 @@ export function parseGANGNAMText(rawText = '') {
   const provRx =
     /^(서울|세종|제주|인천|부산|대전|대구|광주|울산|경기|강원특별자치도|전북특별자치도|강원|충북|충남|경북|경남|전북|전남)\b/;
 
-  // 줄 단위 우선, 없으면 본문에서 첫 매치(이때 ']' 꼬리 제거를 normalizeRegion에서 처리)
   let regionFullCandidate =
     lines.find((l) => provRx.test(l) && !BAD_LINE.test(l)) ||
     (text.match(/(서울|세종|제주|인천|부산|대전|대구|광주|울산|경기|강원특별자치도|전북특별자치도|강원|충북|충남|경북|경남|전북|전남)[^\n]+/)?.[0] || '');
   regionFullCandidate = normSpaces(regionFullCandidate);
 
-  // 최종 region: 기본지역 우선, fallback 후보가 '브라켓/이상문자 없음 + 두 토큰'을 만족할 때만 덮어쓰기
   let region = defaultRegion;
   const regionFromFull = normalizeRegion(regionFullCandidate);
   if (regionFromFull && !/[\[\]]/.test(regionFromFull)) {
     region = regionFromFull;
   }
 
-  /* ---------- 4) 경쟁률: '신청자 18/10' → '18:10' (or '지원 ~ 모집 ~') ---------- */
+  /* ---------- 4) 경쟁률 ---------- */
   let competitionRatio = '';
   {
     let m =
@@ -79,14 +70,14 @@ export function parseGANGNAMText(rawText = '') {
     if (m) competitionRatio = `${m[1]}:${m[2]}`;
   }
 
-  /* ---------- 5) 날짜 파싱 유틸 ---------- */
+  /* ---------- 5) 날짜 유틸 ---------- */
   const toISO = (y, m, d) =>
     `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
   const parseOneDateToISO = (s) => {
     if (!s) return '';
     const nowY = new Date().getFullYear();
-    const src = String(s).replace(/\([^)]+\)/g, ''); // (금) 제거 등
+    const src = String(s).replace(/\([^)]+\)/g, '');
 
     let m = src.match(/(\d{4})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})/);
     if (m) return toISO(+m[1], +m[2], +m[3]);
@@ -164,7 +155,7 @@ export function parseGANGNAMText(rawText = '') {
 
   return {
     company,
-    region,          // ✅ 이제 '서울 광진'처럼 깔끔 (']' 제거)
+    region,
     regionFull: normSpaces(regionFullCandidate),
     providedItems,
     competitionRatio,

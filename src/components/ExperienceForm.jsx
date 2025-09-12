@@ -1,5 +1,5 @@
 // src/components/ExperienceForm.jsx
-// 리뷰노트/디너의여왕 자동 인식 + ★경쟁률 폼단 보정(최후방어) + 지역/제공내역 기존 유지
+// 리뷰노트/강남맛집 모두 커버: 병렬 파싱 + 필드단 병합 + ★경쟁률/지역 최종 보정
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -11,7 +11,7 @@ import { parseAnnouncementDate } from '../utils/parseDates';
 import { toast } from 'react-toastify';
 
 const START_OFFSET_BY_SITE = {
-  '강남맛집': 1,         // ✅ 발표일 다음날 시작
+  '강남맛집': 1,
   '디너의여왕': 1,
   '스토리앤미디어': 1,
   '미블': 1
@@ -34,7 +34,7 @@ const addDaysISO = (iso, days) => {
   return d.toISOString().split('T')[0];
 };
 
-// ✅ 종료일 계산은 '시작일 포함' 기준으로 (기간-1)일을 더함 → 9/6 시작에 21일이면 9/26
+// 종료일 = 시작일 포함 (기간-1)
 const getExperienceEnd = (site, startISO) => {
   if (!startISO) return '';
   const days = DURATIONS_BY_SITE[site] ?? 0;
@@ -52,30 +52,25 @@ const formatRegion = (str) => {
   return [prov, dist].filter(Boolean).join(' ');
 };
 
-// ★ 경쟁률 최후 보정(폼단) — 어떤 복붙도 "N:M"으로 정리 (기존 값은 절대 비우지 않음)
+// ★ 경쟁률 최후 보정
 const normalizeCompetition = (txt) => {
   if (!txt) return '';
   const src = String(txt).replace(/[\u00A0\u200B-\u200D\uFEFF]/g, ' ').trim();
 
-  // 1) "지원 1234 / 모집 20" 류
   let m = src.match(/지원[^\d]*([\d,]+)\s*[\-–—:|/~]?\s*[^\d]*모집[^\d]*([\d,]+)\s*명?/i);
   if (m) return `${m[1].replace(/,/g,'')}:${m[2].replace(/,/g,'')}`;
 
-  // 2) "지원 1234명 모집 20명" 분리 매칭
   const sup = src.match(/지원[^\d]*([\d,]+)\s*명?/i);
   const rec = src.match(/모집[^\d]*([\d,]+)\s*명?/i);
   if (sup && rec) return `${sup[1].replace(/,/g,'')}:${rec[1].replace(/,/g,'')}`;
 
-  // 3) "1234 / 20" (문맥 보조)
   const m2 = src.match(/(\d{1,3}(?:,\d{3})*)\s*\/\s*(\d{1,3}(?:,\d{3})*)/);
-  if (m2 && /실시간\s*지원\s*현황|지원|모집/.test(src))
+  if (m2 && /실시간\s*지원\s*현황|지원|모집|신청자/.test(src))
     return `${m2[1].replace(/,/g,'')}:${m2[2].replace(/,/g,'')}`;
 
-  // 4) "지원: 1234 ... 모집: 20"
   const m3 = src.match(/지원\s*[:\-]?\s*([\d,]+)[^\d]+모집\s*[:\-]?\s*([\d,]+)/i);
   if (m3) return `${m3[1].replace(/,/g,'')}:${m3[2].replace(/,/g,'')}`;
 
-  // 5) ✅ 이미 "N:M" 또는 "N-M"처럼 정규형으로 들어온 값 유지
   const m4 = src.match(/^\s*(\d{1,3}(?:,\d{3})*)\s*[:\-]\s*(\d{1,3}(?:,\d{3})*)\s*$/);
   if (m4) return `${m4[1].replace(/,/g,'')}:${m4[2].replace(/,/g,'')}`;
 
@@ -85,7 +80,8 @@ const normalizeCompetition = (txt) => {
 const detectSiteFromText = (txt = '') => {
   const t = String(txt || '');
   if (/디너의여왕|dinnerqueen\.net/i.test(t)) return '디너의여왕';
-  if (/리뷰노트|reviewnote\.co\.kr/i.test(t)) return '리뷰노트';
+  if (/강남맛집|캠페인\s*신청기간|gangnammatzip/i.test(t)) return '강남맛집';
+  if (/리뷰노트|reviewnote\.co\.kr/i.test(t) || /실시간\s*지원\s*현황|체험기간|리뷰어\s*발표/.test(t)) return '리뷰노트';
   return '';
 };
 
@@ -109,14 +105,14 @@ const getSiteNameFromUrl = (url) => {
 
 const extractNaverPlaceUrlFromText = (text = '') => {
   const patterns = [
-    /https?:\/\/(?:m\.)?place\.naver\.com\/[^\s'"]+/i,
-    /https?:\/\/map\.naver\.com\/[^\s'"]+/i,
-    /https?:\/\/naver\.me\/[^\s'"]+/i,
+    /https?:\/\/(?:m\.)?place\.naver\.com\/[^\s'")]+/i,
+    /https?:\/\/map\.naver\.com\/[^\s'")]+/i,
+    /https?:\/\/naver\.me\/[^\s'")]+/i,
     /https?:\/\/search\.naver\.com\/search\.nhn\?[^\s'"]*query=[^\s'"]*/i
   ];
   for (const re of patterns) {
     const m = text.match(re);
-    if (m) return m[0];
+    if (m) return m[0].replace(/[.,;:!?…]+$/g,'').replace(/\)+$/,'');
   }
   return '';
 };
@@ -139,11 +135,16 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
     return { announcementDate: annISO, experienceStart: startISO, experienceEnd: endISO };
   };
 
-  const looksLikeGangnam = (txt = '') => /강남맛집/.test(txt) || /캠페인\s*신청기간/.test(txt);
+  const looksLikeGangnam = (txt = '') => /강남맛집|캠페인\s*신청기간/i.test(txt);
 
-  const mergeParsedData = (prev, parsed) => {
+  // 병합 유틸: 우선순위 배열대로 첫 값 채택
+  const mergeByPriority = (priorityList, keys) => {
     const out = {};
-    for (const k in parsed) if ((!prev[k] || prev[k] === '') && parsed[k]) out[k] = parsed[k];
+    for (const k of keys) {
+      for (const src of priorityList) {
+        if (src && src[k]) { out[k] = src[k]; break; }
+      }
+    }
     return out;
   };
 
@@ -154,55 +155,72 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
     processedTextRef.current = raw;
     setIsLoading(true);
 
-    const siteFromText = detectSiteFromText(raw);
-    const isHtml = /<\/?[a-z][\s\S]*>/i.test(raw);
-    let parsed = {};
-    let siteName = siteFromText;
+    // 1) 사이트 힌트
+    const siteHint = detectSiteFromText(raw);
 
-    if (siteFromText === '디너의여왕') {
-      parsed = await parseDINNERText(raw);
-    } else if (siteFromText === '리뷰노트') {
-      parsed = await parseReviewNoteText(raw);
-    } else if (looksLikeGangnam(raw)) {
-      parsed = await parseGANGNAMText(raw);
-      siteName = '강남맛집';
-    } else if (isHtml) {
-      parsed = await parseReviewNoteText(raw);
-      siteName = parsed.siteName || '리뷰노트';
-    } else {
-      parsed = await parseYellowPanelText(raw);
+    // 2) 세 파서 병렬 실행
+    let parsedRN = {};
+    let parsedGM = {};
+    let parsedDQ = {};
+
+    try { parsedRN = await parseReviewNoteText(raw) || {}; } catch {}
+    try { parsedGM = await parseGANGNAMText(raw) || {}; } catch {}
+    if (siteHint === '디너의여왕') {
+      try { parsedDQ = await parseDINNERText(raw) || {}; } catch {}
     }
 
-    // 네이버 플레이스 보완
-    if (!parsed.naverPlaceUrl) {
+    // 3) 우선순위 결정
+    const priority = (() => {
+      if (siteHint === '강남맛집') return [parsedGM, parsedRN, parsedDQ];
+      if (siteHint === '리뷰노트') return [parsedRN, parsedGM, parsedDQ];
+      if (siteHint === '디너의여왕') return [parsedDQ, parsedRN, parsedGM];
+      // 힌트 없으면 리뷰노트가 더 일반적인 라벨이 많으니 RN → GM
+      return [parsedRN, parsedGM, parsedDQ];
+    })();
+
+    // 4) 병합 (필수 키 우선)
+    const mainKeys = [
+      'siteName','company','region','regionFull','providedItems',
+      'announcementDate','experienceStart','experienceEnd','experiencePeriod','competitionRatio','naverPlaceUrl'
+    ];
+    const merged = mergeByPriority(priority, mainKeys);
+
+    // 5) 네이버 플레이스 보완
+    if (!merged.naverPlaceUrl) {
       const found = extractNaverPlaceUrlFromText(raw);
-      if (found) parsed.naverPlaceUrl = found;
+      if (found) merged.naverPlaceUrl = found;
     }
 
-    // 지역/경쟁률 폼단 최종 보정
-    if (parsed.regionFull && !parsed.region) parsed.region = formatRegion(parsed.regionFull);
-    else if (parsed.region) {
-      parsed.region = formatRegion(parsed.region);
-      parsed.regionFull = parsed.regionFull || parsed.region;
+    // 6) 지역/경쟁률 최종 정규화
+    if (merged.regionFull && !merged.region) merged.region = formatRegion(merged.regionFull);
+    else if (merged.region) {
+      merged.region = formatRegion(merged.region);
+      merged.regionFull = merged.regionFull || merged.region;
     }
 
-    // 경쟁률: 정규화 실패 시 원본 유지 (증발 방지)
-    if (parsed.competitionRatio) {
-      const norm = normalizeCompetition(parsed.competitionRatio);
-      parsed.competitionRatio = norm || String(parsed.competitionRatio);
+    if (merged.competitionRatio) {
+      const n = normalizeCompetition(merged.competitionRatio);
+      merged.competitionRatio = n || String(merged.competitionRatio);
     } else {
       const last = normalizeCompetition(raw);
-      if (last) parsed.competitionRatio = last;
+      if (last) merged.competitionRatio = last;
     }
 
-    if (parsed.announcementDate) parsed.announcementDate = parseAnnouncementDate(parsed.announcementDate);
-    if (parsed.experienceStart)  parsed.experienceStart  = parseAnnouncementDate(parsed.experienceStart);
-    if (parsed.experienceEnd)    parsed.experienceEnd    = parseAnnouncementDate(parsed.experienceEnd);
+    // 7) 날짜 ISO 변환
+    if (merged.announcementDate) merged.announcementDate = parseAnnouncementDate(merged.announcementDate);
+    if (merged.experienceStart)  merged.experienceStart  = parseAnnouncementDate(merged.experienceStart);
+    if (merged.experienceEnd)    merged.experienceEnd    = parseAnnouncementDate(merged.experienceEnd);
+
+    // 8) siteName 보강
+    const siteNameFinal =
+      merged.siteName ||
+      siteHint ||
+      (looksLikeGangnam(raw) ? '강남맛집' : '리뷰노트');
 
     setFormData(prev => ({
       ...prev,
-      ...parsed,
-      siteName: siteName || parsed.siteName || '',
+      ...merged,
+      siteName: siteNameFinal,
       extractedText: raw
     }));
 
@@ -225,10 +243,9 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
         data.regionFull = rFull;
       }
 
-      // 경쟁률도 폼단에서 한 번 더(실패 시 원본 보존)
       if (data.competitionRatio) {
-        const norm = normalizeCompetition(data.competitionRatio);
-        data.competitionRatio = norm || String(data.competitionRatio);
+        const n = normalizeCompetition(data.competitionRatio);
+        data.competitionRatio = n || String(data.competitionRatio);
       }
 
       let patch = {};
@@ -285,11 +302,10 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
       const normalized = {
         ...selectedExperience,
         region: formatRegion(selectedExperience.region || selectedExperience.regionFull || ''),
-        // ✅ 경쟁률 증발 방지: 정규화 실패 시 원본 유지
         competitionRatio: (() => {
           const raw = selectedExperience.competitionRatio || '';
-          const norm = normalizeCompetition(raw);
-          return norm || raw;
+          const n = normalizeCompetition(raw);
+          return n || raw;
         })(),
         isExtended: (selectedExperience.isExtended === true) || (selectedExperience.extension === true) || false,
       };
@@ -309,14 +325,14 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
     if (name === 'announcementDate') {
       const iso = parseAnnouncementDate(value);
       const site = formData.siteName || '리뷰노트';
-      const patch = setDatesByAnnouncement(site, iso); // ✅ 강남맛집은 다음날 시작 + 21일-1
+      const patch = setDatesByAnnouncement(site, iso);
       setFormData(prev => ({ ...prev, ...patch }));
       return;
     }
 
     if (name === 'experienceStart') {
       const site = formData.siteName || '리뷰노트';
-      const end = getExperienceEnd(site, value); // ✅ 종료일 = 시작 + (기간-1)
+      const end = getExperienceEnd(site, value);
       setFormData(prev => ({ ...prev, experienceStart: value, experienceEnd: end }));
       return;
     }
@@ -386,7 +402,7 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
     processedTextRef.current = '';
   };
 
-  // (선택) 업체명으로 네이버 플레이스 자동 보완
+  // (선택) 업체명으로 플레이스 자동 보완
   useEffect(() => {
     const fetchNaverPlaceUrl = async () => {
       if (formData.company && !formData.naverPlaceUrl) {
@@ -471,7 +487,7 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
             ['가족용', 'isFamily'],
             ['여가형', 'isLeisure'],
           ];
-          const colIndentPx = [2, 36, 45]; // ✅ 패딩 고정
+          const colIndentPx = [2, 36, 45];
           return (
             <div className="grid grid-cols-3 gap-3">
               {items.map(([label, name], idx) => {

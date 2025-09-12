@@ -1,5 +1,5 @@
 // server/parsers/parseReviewNoteText.js
-// 리뷰노트: HTML/텍스트 복붙 모두 대응 + 제공내역/경쟁률/지역 강화 + 노이즈 제거
+// 리뷰노트: 텍스트/HTML 복붙 모두 대응 + 일정/경쟁률 강화 + 회사명 노이즈(네이버 검색/주최자 대행사) 차단
 import { load } from 'cheerio';
 
 /* -------------------- 유틸 -------------------- */
@@ -20,6 +20,11 @@ const toISO = (s) => {
     const y = new Date().getFullYear();
     return `${y}-${m2[1].padStart(2, '0')}-${m2[2].padStart(2, '0')}`;
   }
+  const m3 = String(s).match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  if (m3) {
+    const y = new Date().getFullYear();
+    return `${y}-${String(+m3[1]).padStart(2,'0')}-${String(+m3[2]).padStart(2,'0')}`;
+  }
   return '';
 };
 
@@ -28,22 +33,23 @@ const formatRegion = (str) => {
   if (!str) return '';
   let s = String(str).replace(/\//g, ' ').replace(/\s+/g, ' ').trim();
   const parts = s.split(/\s+/);
-  const prov = (parts[0] || '').replace(/(특별시|광역시|도)$/,'');
-  const dist = (parts[1] || '').replace(/(시|군|구)$/,'');
+  const prov = (parts[0] || '').replace(/(특별시|광역시|도|특별자치도)$/,'');
+  const dist = (parts[1] || '').replace(/(시|군|구)$/,'').replace(/]$/,'');
   return [prov, dist].filter(Boolean).join(' ');
 };
 
-// "지원 68 / 모집 10" | "지원 68   모집 10" | 줄바꿈 포함까지 커버 → "68:10"
+// "지원 68 / 모집 10" | 줄바꿈 포함 → "68:10"
 const formatCompetition = (txt) => {
   if (!txt) return '';
   const t = String(txt);
-  let m = t.match(/지원\s*(\d+)\s*[/:\-]?\s*모집\s*(\d+)/i);
-  if (!m) m = t.match(/지원\s*(\d+)[\s\S]*?모집\s*(\d+)/i); // 줄바꿈 사이도 허용
-  if (!m) m = t.match(/(\d+)\s*[/]\s*(\d+)/);
-  return m ? `${m[1]}:${m[2]}` : '';
+  let m = t.match(/지원[^\d]*([\d,]+)\s*[/:\-]?\s*모집[^\d]*([\d,]+)/i);
+  if (!m) m = t.match(/지원[^\d]*([\d,]+)[\s\S]*?모집[^\d]*([\d,]+)/i);
+  if (!m) m = t.match(/(\d{1,3}(?:,\d{3})*)\s*[/]\s*(\d{1,3}(?:,\d{3})*)/);
+  if (!m) return '';
+  return `${m[1].replace(/,/g,'')}:${m[2].replace(/,/g,'')}`;
 };
 
-/* -------- URL만 깔끔히 뽑기: 괄호/따옴표/마침표 꼬리 제거 (개선版) -------- */
+/* -------- URL만 깔끔히 뽑기: 괄호/따옴표/마침표 꼬리 제거 -------- */
 const pickNaverPlace = (txt = '') => {
   const src = String(txt);
   const RXES = [
@@ -67,10 +73,9 @@ const pickNaverPlace = (txt = '') => {
 /* -------------------- 공통: 텍스트 라인 도우미 -------------------- */
 const splitLines = (text) => String(text || '')
   .split(/\r?\n/)
-  .map(s => norm(s))
+  .map((s) => norm(s))
   .filter(Boolean);
 
-// 라벨 다음 의미있는 한 줄 반환 (빈줄/광고/내비 문구 스킵)
 const nextMeaningful = (lines, fromIdx) => {
   const bad = /(NAVER\s*©|카카오|이미지|Image|지도|길찾기|복사|클립|배너)/i;
   for (let i = fromIdx + 1; i < Math.min(lines.length, fromIdx + 6); i++) {
@@ -82,26 +87,32 @@ const nextMeaningful = (lines, fromIdx) => {
   return '';
 };
 
-/* -------- 업체명 노이즈 제거: "네이버 검색" & "사장님" 등 무시 -------- */
-const BAD_COMPANY_TOKENS = /(네이버\s*검색|검색\s*버튼|Naver\s*Search)/i;
-// 끝에 붙는 직함 꼬리 제거(사장/대표/원장/점장 + '님' + 선택적 한글이름 2~4자)
+/* -------- 업체명 클린업: "네이버 검색"/"사장님" 제거 + 대행사 차단 -------- */
+const BAD_COMPANY_TOKENS = /(네이버\s*검색|네이버검색|검색\s*버튼|Naver\s*Search)/i;
 const HONORIFIC_SUFFIX = /\s*(?:사장|대표|원장|점장)\s*님?(?:\s*[가-힣]{2,4})?\s*$/i;
+const AGENCY_WORDS = /(대행사|마케팅|브랜딩|애드|미디어|PR|에이전시|본부|지부|센터|광고)/i;
 
 const cleanCompany = (s) => {
   if (!s) return '';
-  // [서울/중랑구] 같은 프리픽스 제거
-  let t = String(s).replace(/^\s*(?:\[[^\]]+\]\s*)+/g, '').trim();
-  // '주최자:' 프리픽스 제거
-  t = t.replace(/^주최자\s*[:\-]?\s*/i, '').trim();
-  // 괄호 주석 중 "네이버 검색" 포함시 제거
+  let t = String(s)
+    .replace(/^\s*(?:\[[^\]]+\]\s*)+/g, '')     // [지역] 프리픽스 제거
+    .replace(/^주최자\s*[:\-]?\s*/i, '')        // "주최자:" 프리픽스 제거
+    .trim();
+
+  // 문장 끝/괄호 안의 "네이버 검색" 제거 (붙어서 들어오는 케이스 포함)
   t = t.replace(/\s*\((?:.*?)네이버\s*검색(?:.*?)\)\s*$/i, '').trim();
-  // 끝에 붙은 "- 네이버 검색" 꼬리 제거
+  t = t.replace(/네이버\s*검색\s*$/i, '').trim();
+  t = t.replace(/네이버검색\s*$/i, '').trim();
   t = t.replace(/\s*-\s*네이버\s*검색\s*$/i, '').trim();
-  if (BAD_COMPANY_TOKENS.test(t)) return '';
-  // 직함 꼬리(사장님 등) 제거
+
+  // 직함 꼬리 컷
   t = t.replace(HONORIFIC_SUFFIX, '').trim();
-  // 의미 없는 섹션명 제거
+
+  // 노이즈 전체 차단
+  if (BAD_COMPANY_TOKENS.test(t)) return '';
+  if (AGENCY_WORDS.test(t)) return '';
   if (/^(블로그|인스타|유튜브)$/i.test(t)) return '';
+
   return t;
 };
 
@@ -110,9 +121,9 @@ function parseTextReviewNote(text) {
   const body = String(text || '');
   const lines = splitLines(body);
 
-  // 업체명: [서울/중랑구] 다음 텍스트 또는 제공내역 라인 근처 (네이버 검색/사장님 노이즈 무시)
+  // 1) 회사명: 상단 [지역] 라인 우선. 실패 시에도 "주최자" 블록은 절대 사용하지 않음(대행사 오인 방지)
   let company = '';
-  for (let i = 0; i < Math.min(lines.length, 12); i++) {
+  for (let i = 0; i < Math.min(lines.length, 15); i++) {
     if (/^\[.*?\]/.test(lines[i])) {
       const after = cleanCompany(lines[i]);
       if (after) { company = after; break; }
@@ -120,28 +131,20 @@ function parseTextReviewNote(text) {
       if (next) { company = next; break; }
     }
   }
+  // 보강: 상단부에서 라벨성 문구가 아니고 대행사 키워드 없는 짧은 텍스트를 후보로
   if (!company) {
-    const idx = lines.findIndex(l => /제공서비스\/물품|제공\s*내역|제공\s*품목/i.test(l));
-    if (idx > 0) {
-      for (let j = idx - 1; j >= Math.max(0, idx - 5); j--) {
-        const s = cleanCompany(lines[j]);
-        if (s && !/제공|방문|키워드|체험단/i.test(s)) { company = s; break; }
-      }
-    }
-  }
-  // 주최자 블록 보강: "주최자\nOOO 사장님" 패턴
-  if (!company) {
-    const jx = lines.findIndex(l => /주최자/i.test(l));
-    if (jx !== -1) {
-      const cand = cleanCompany(nextMeaningful(lines, jx));
-      if (cand) company = cand;
+    for (let i = 0; i < Math.min(lines.length, 12); i++) {
+      const s = cleanCompany(lines[i]);
+      if (!s) continue;
+      if (/(제공|방문|키워드|체험단|신청|발표|일정|현황|주소)/.test(s)) continue;
+      if (s.length > 2 && s.length <= 40) { company = s; break; }
     }
   }
 
-  // 지역: "방문 주소" 같은 줄에서 뒷부분 또는 다음 의미있는 줄
+  // 2) 지역: "방문 주소" 라벨 라인/다음 라인
   let regionFull = '';
   {
-    const i = lines.findIndex(l => /방문\s*주소/i.test(l));
+    const i = lines.findIndex((l) => /방문\s*주소/i.test(l));
     if (i !== -1) {
       const after = lines[i].replace(/.*방문\s*주소\s*/i, '').trim();
       regionFull = after || nextMeaningful(lines, i) || '';
@@ -149,10 +152,10 @@ function parseTextReviewNote(text) {
   }
   const region = formatRegion(regionFull);
 
-  // 제공내역: "제공서비스/물품" 이후 섹션 경계 전까지 수집
+  // 3) 제공내역: "제공서비스/물품" 이후 섹션 경계 전까지 수집
   let providedItems = '';
   {
-    const idx = lines.findIndex(l => /제공서비스\/물품|제공\s*내역|제공\s*품목/i.test(l));
+    const idx = lines.findIndex((l) => /제공서비스\/물품|제공\s*내역|제공\s*품목/i.test(l));
     if (idx !== -1) {
       const breakers = /(방문\s*정보|키워드\s*정보|체험단\s*미션|체험단\s*일정|실시간\s*지원\s*현황|문의\s*사항|공정위|체험단\s*신청기간|리뷰어\s*발표)/i;
       const bag = [];
@@ -160,17 +163,17 @@ function parseTextReviewNote(text) {
         const L = lines[k];
         if (!L) continue;
         if (breakers.test(L)) break;
-        if (/(만원|원|세트|메뉴|코스|리필|특선|2인|3인|코스요리|바우처|이용권|식사권)/.test(L)) bag.push(L);
-        if (bag.length === 0) bag.push(L); // 한 줄만 있는 케이스 허용
+        if (/(만원|원|세트|메뉴|코스|리필|특선|2인|3인|코스요리|바우처|이용권|식사권|숙박|이용료|식사권|체험권)/.test(L)) bag.push(L);
+        if (bag.length === 0) bag.push(L);
       }
       providedItems = bag.join(', ');
     }
   }
 
-  // 경쟁률
+  // 4) 경쟁률: "실시간 지원 현황" 블록(다음줄까지) → 실패 시 전체에서 재탐색
   let competitionRatio = '';
   {
-    const i = lines.findIndex(l => /실시간\s*지원\s*현황/i.test(l));
+    const i = lines.findIndex((l) => /실시간\s*지원\s*현황/i.test(l));
     if (i !== -1) {
       competitionRatio = formatCompetition(lines[i]);
       if (!competitionRatio) {
@@ -181,18 +184,19 @@ function parseTextReviewNote(text) {
     if (!competitionRatio) competitionRatio = formatCompetition(body);
   }
 
-  // 일정
+  // 5) 일정: "리뷰어 발표", "체험기간/체험&리뷰" (같은 줄 or 다음 줄)
   const takeAfter = (re) => {
-    const i = lines.findIndex(l => re.test(l));
+    const i = lines.findIndex((l) => re.test(l));
     if (i === -1) return '';
     const cur = lines[i].replace(re, '').trim();
     return cur || nextMeaningful(lines, i) || '';
   };
+
   const annBlock = takeAfter(/리뷰어\s*발표/i);
   const expBlock = takeAfter(/(체험기간|체험&리뷰)/i);
 
   const pickFirstDate = (s) => {
-    const m = String(s).match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2})/);
+    const m = String(s).match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/);
     return m ? m[1] : '';
   };
 
@@ -205,7 +209,7 @@ function parseTextReviewNote(text) {
       experienceStart = toISO(pickFirstDate(parts[0]));
       experienceEnd   = toISO(pickFirstDate(parts[1]));
     } else {
-      const all = expBlock.match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2})/g) || [];
+      const all = expBlock.match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/g) || [];
       if (all.length >= 2) { experienceStart = toISO(all[0]); experienceEnd = toISO(all[1]); }
     }
   }
@@ -241,12 +245,12 @@ function parseHtmlReviewNote(html) {
     return norm(th.next('td').text());
   };
 
-  // 업체명 (네이버 검색/사장님 노이즈 제거 및 [지역] 프리픽스 제거)
+  // 회사명: 타이틀에서만 뽑고, "주최자" 블록은 절대 사용하지 않음
   let company =
     cleanCompany(norm($('h1.campaign-title').first().text())) ||
     cleanCompany(norm($('h2,h3').first().text()));
 
-  // 지역: dd/td 없으면 "방문 주소" 라벨 + 다음 텍스트도 커버
+  // 지역
   let regionFull = dd('방문 주소') || td('방문 주소');
   if (!regionFull) {
     const bodyText = $('body').text();
@@ -259,7 +263,7 @@ function parseHtmlReviewNote(html) {
   }
   const region = formatRegion(regionFull);
 
-  // 제공내역: dd/td → 실패 시 텍스트 파서 방식 보강
+  // 제공내역
   let providedItems =
     dd('제공서비스/물품') || dd('제공내역') || td('제공서비스/물품') || td('제공내역');
   if (!providedItems) {
@@ -273,7 +277,7 @@ function parseHtmlReviewNote(html) {
         const L = lines[k];
         if (!L) continue;
         if (breakers.test(L)) break;
-        if (/(만원|원|세트|메뉴|코스|리필|특선|2인|3인|코스요리|바우처|이용권|식사권)/.test(L)) bag.push(L);
+        if (/(만원|원|세트|메뉴|코스|리필|특선|2인|3인|코스요리|바우처|이용권|식사권|숙박|이용료|체험권)/.test(L)) bag.push(L);
         if (bag.length === 0) bag.push(L);
       }
       providedItems = bag.join(', ');
@@ -286,7 +290,7 @@ function parseHtmlReviewNote(html) {
 
   let announcementDate = '';
   if (annRaw) {
-    const m = annRaw.match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2})/);
+    const m = annRaw.match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/);
     if (m) announcementDate = toISO(m[1]);
   }
 
@@ -294,12 +298,12 @@ function parseHtmlReviewNote(html) {
   if (expRaw) {
     const parts = expRaw.split(/\s*(?:~|–|—|-|to)\s*/i);
     if (parts.length >= 2) {
-      const s = parts[0].match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2})/);
-      const e = parts[1].match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2})/);
+      const s = parts[0].match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/);
+      const e = parts[1].match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/);
       if (s) experienceStart = toISO(s[1]);
       if (e) experienceEnd   = toISO(e[1]);
     } else {
-      const all = expRaw.match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2})/g) || [];
+      const all = expRaw.match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/g) || [];
       if (all.length >= 2) { experienceStart = toISO(all[0]); experienceEnd = toISO(all[1]); }
     }
   }
