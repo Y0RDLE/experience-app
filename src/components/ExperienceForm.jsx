@@ -117,6 +117,9 @@ const extractNaverPlaceUrlFromText = (text = '') => {
   return '';
 };
 
+// ISO 판별: 이미 YYYY-MM-DD면 재파싱 금지
+const isISODate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
+
 export default function ExperienceForm({ selectedExperience, onSelect }) {
   const [formData, setFormData] = useState({
     company: '', region: '', regionFull: '', siteUrl: '', siteName: '', naverPlaceUrl: '',
@@ -206,10 +209,16 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
       if (last) merged.competitionRatio = last;
     }
 
-    // 7) 날짜 ISO 변환
-    if (merged.announcementDate) merged.announcementDate = parseAnnouncementDate(merged.announcementDate);
-    if (merged.experienceStart)  merged.experienceStart  = parseAnnouncementDate(merged.experienceStart);
-    if (merged.experienceEnd)    merged.experienceEnd    = parseAnnouncementDate(merged.experienceEnd);
+    // 7) 날짜 ISO 변환 (이미 ISO면 재파싱 금지)
+    if (merged.announcementDate && !isISODate(merged.announcementDate)) {
+      merged.announcementDate = parseAnnouncementDate(merged.announcementDate);
+    }
+    if (merged.experienceStart && !isISODate(merged.experienceStart)) {
+      merged.experienceStart = parseAnnouncementDate(merged.experienceStart);
+    }
+    if (merged.experienceEnd && !isISODate(merged.experienceEnd)) {
+      merged.experienceEnd = parseAnnouncementDate(merged.experienceEnd);
+    }
 
     // 8) siteName 보강
     const siteNameFinal =
@@ -250,7 +259,9 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
 
       let patch = {};
       if (data.announcementDate) {
-        const annISO = parseAnnouncementDate(data.announcementDate);
+        const annISO = isISODate(data.announcementDate)
+          ? data.announcementDate
+          : parseAnnouncementDate(data.announcementDate);
         patch = setDatesByAnnouncement(siteName || '리뷰노트', annISO);
       }
 
@@ -323,7 +334,7 @@ export default function ExperienceForm({ selectedExperience, onSelect }) {
     }
 
     if (name === 'announcementDate') {
-      const iso = parseAnnouncementDate(value);
+      const iso = isISODate(value) ? value : parseAnnouncementDate(value);
       const site = formData.siteName || '리뷰노트';
       const patch = setDatesByAnnouncement(site, iso);
       setFormData(prev => ({ ...prev, ...patch }));

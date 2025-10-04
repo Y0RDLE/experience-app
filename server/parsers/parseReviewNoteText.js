@@ -8,23 +8,62 @@ const norm = (s) => String(s || '')
   .replace(/\s+/g, ' ')
   .trim();
 
+const pad2 = (n) => String(n).padStart(2, '0');
+
+// YYYY-MM-DD 안전 변환기 (다양한 포맷 → ISO)
+// - 25년 10월 23일
+// - 2025년 10월 23일
+// - 25.10.23 / 2025.10.23
+// - 10/23 (연도 없음 → 올해)
+// - 10월 23일 (연도 없음 → 올해)
 const toISO = (s) => {
   if (!s) return '';
-  const m = String(s).match(/(\d{2,4})[.\-\/]\s?(\d{1,2})[.\-\/]?\s?(\d{1,2})/);
-  if (m) {
-    let y = m[1]; if (y.length === 2) y = String(2000 + parseInt(y, 10));
-    return `${y}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  const src = String(s)
+    .replace(/\((?:월|화|수|목|금|토|일)\)/g, '')      // 요일 제거
+    .replace(/[년\.\-\/]/g, (m) => m === '년' ? '년' : m) // 형태 유지
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // 1) YYYY년 M월 D일 또는 YY년 M월 D일
+  {
+    const m = src.match(/(\d{2,4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+    if (m) {
+      let y = m[1];
+      if (y.length === 2) y = String(2000 + parseInt(y, 10)); // 00~99 → 2000~2099
+      const mo = pad2(m[2]);
+      const da = pad2(m[3]);
+      return `${y}-${mo}-${da}`;
+    }
   }
-  const m2 = String(s).match(/(\d{1,2})[./](\d{1,2})/);
-  if (m2) {
-    const y = new Date().getFullYear();
-    return `${y}-${m2[1].padStart(2, '0')}-${m2[2].padStart(2, '0')}`;
+
+  // 2) YYYY.M.D / YYYY-M-D / YYYY/M/D  또는  YY.M.D 등
+  {
+    const m = src.match(/(\d{2,4})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})/);
+    if (m) {
+      let y = m[1];
+      if (y.length === 2) y = String(2000 + parseInt(y, 10));
+      return `${y}-${pad2(m[2])}-${pad2(m[3])}`;
+    }
   }
-  const m3 = String(s).match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
-  if (m3) {
-    const y = new Date().getFullYear();
-    return `${y}-${String(+m3[1]).padStart(2,'0')}-${String(+m3[2]).padStart(2,'0')}`;
+
+  // 3) M.D (연도 없음 → 올해)
+  {
+    const m = src.match(/(^|\s)(\d{1,2})[./\-](\d{1,2})(\s|$)/);
+    if (m) {
+      const y = new Date().getFullYear();
+      return `${y}-${pad2(m[2])}-${pad2(m[3])}`;
+    }
   }
+
+  // 4) M월 D일 (연도 없음 → 올해)
+  {
+    const m = src.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+    if (m) {
+      const y = new Date().getFullYear();
+      return `${y}-${pad2(m[1])}-${pad2(m[2])}`;
+    }
+  }
+
   return '';
 };
 
@@ -163,7 +202,7 @@ function parseTextReviewNote(text) {
         const L = lines[k];
         if (!L) continue;
         if (breakers.test(L)) break;
-        if (/(만원|원|세트|메뉴|코스|리필|특선|2인|3인|코스요리|바우처|이용권|식사권|숙박|이용료|식사권|체험권)/.test(L)) bag.push(L);
+        if (/(만원|원|세트|메뉴|코스|리필|특선|2인|3인|코스요리|바우처|이용권|식사권|숙박|이용료|체험권)/.test(L)) bag.push(L);
         if (bag.length === 0) bag.push(L);
       }
       providedItems = bag.join(', ');
@@ -196,7 +235,12 @@ function parseTextReviewNote(text) {
   const expBlock = takeAfter(/(체험기간|체험&리뷰)/i);
 
   const pickFirstDate = (s) => {
-    const m = String(s).match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/);
+    // 우선순위: 년월일 → 구분자(.,-/) 전체 → 월/일 → 한글 월/일
+    const rx1 = /(\d{2,4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일)/;
+    const rx2 = /(\d{2,4}[.\-\/]\s*\d{1,2}[.\-\/]\s*\d{1,2})/;
+    const rx3 = /(\d{1,2}[./\-]\d{1,2})/;
+    const rx4 = /(\d{1,2}\s*월\s*\d{1,2}\s*일)/;
+    const m = String(s).match(rx1) || String(s).match(rx2) || String(s).match(rx3) || String(s).match(rx4);
     return m ? m[1] : '';
   };
 
@@ -209,7 +253,7 @@ function parseTextReviewNote(text) {
       experienceStart = toISO(pickFirstDate(parts[0]));
       experienceEnd   = toISO(pickFirstDate(parts[1]));
     } else {
-      const all = expBlock.match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/g) || [];
+      const all = (expBlock.match(/(\d{2,4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일|\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./\-]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/g) || []);
       if (all.length >= 2) { experienceStart = toISO(all[0]); experienceEnd = toISO(all[1]); }
     }
   }
@@ -290,7 +334,11 @@ function parseHtmlReviewNote(html) {
 
   let announcementDate = '';
   if (annRaw) {
-    const m = annRaw.match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/);
+    const m =
+      annRaw.match(/(\d{2,4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일)/) ||
+      annRaw.match(/(\d{2,4}[.\-\/]\s*\d{1,2}[.\-\/]\s*\d{1,2})/) ||
+      annRaw.match(/(\d{1,2}[./\-]\d{1,2})/) ||
+      annRaw.match(/(\d{1,2}\s*월\s*\d{1,2}\s*일)/);
     if (m) announcementDate = toISO(m[1]);
   }
 
@@ -298,12 +346,14 @@ function parseHtmlReviewNote(html) {
   if (expRaw) {
     const parts = expRaw.split(/\s*(?:~|–|—|-|to)\s*/i);
     if (parts.length >= 2) {
-      const s = parts[0].match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/);
-      const e = parts[1].match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/);
+      const s =
+        parts[0].match(/(\d{2,4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일|\d{2,4}[.\-\/]\s*\d{1,2}[.\-\/]\s*\d{1,2}|\d{1,2}[./\-]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/);
+      const e =
+        parts[1].match(/(\d{2,4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일|\d{2,4}[.\-\/]\s*\d{1,2}[.\-\/]\s*\d{1,2}|\d{1,2}[./\-]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/);
       if (s) experienceStart = toISO(s[1]);
       if (e) experienceEnd   = toISO(e[1]);
     } else {
-      const all = expRaw.match(/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|\d{1,2}[./]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/g) || [];
+      const all = expRaw.match(/(\d{2,4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일|\d{2,4}[.\-\/]\s*\d{1,2}[.\-\/]\s*\d{1,2}|\d{1,2}[./\-]\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일)/g) || [];
       if (all.length >= 2) { experienceStart = toISO(all[0]); experienceEnd = toISO(all[1]); }
     }
   }
