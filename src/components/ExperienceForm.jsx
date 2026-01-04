@@ -24,7 +24,8 @@ const DURATIONS_BY_SITE = {
   '디너의여왕': 14,
   '레뷰': 19,
   '스토리앤미디어': 21,
-  '미블': 12
+  '미블': 12,
+  '체험뷰': 16,
 };
 
 const addDaysISO = (iso, days) => {
@@ -97,6 +98,7 @@ const getSiteNameFromUrl = (url) => {
       'dinnerqueen.net': '디너의여왕',
       'revu.net': '레뷰',
       'popomon.com': '포포몬',
+      'chvu.co.kr': '체험뷰'
     };
     for (const d in map) if (host === d || host.endsWith(`.${d}`)) return map[d];
   } catch {}
